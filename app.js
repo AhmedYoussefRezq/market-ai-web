@@ -159,6 +159,23 @@ function addFreeModels(source){
   saveProviders(list); renderProviders();
   err(added ? `اتضافت ${added} نماذج مجانية من ${set.label} — كلهم هيحللوا بالتوازي.` : `كل نماذج ${set.label} موجودة بالفعل.`);
 }
+// One paste is enough: save the key and expand all free OpenRouter models.
+function quickSetup(){
+  const key = el('quickKey').value.trim();
+  if(!key){ err('الصق المفتاح الأول من openrouter.ai/keys'); return; }
+  addTemplates();
+  const list = providers();
+  list.forEach(p=>{ if((p.base_url||'').startsWith('https://openrouter.ai/api/v1')) p.api_key=key; });
+  if(!list.some(p=>p.name.toLowerCase()==='openrouter')){
+    list.push({name:'openrouter',base_url:FREE_MODEL_SETS.openrouter.base,
+      model:'google/gemma-4-26b-a4b-it:free',api_key:key,enabled:true});
+  }
+  saveProviders(list);
+  addFreeModels('openrouter');
+  el('quickKey').value='';
+  const n = providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
+  err(`تم ✅ المفتاح اتحفظ واتضافت كل النماذج المجانية — ${n} نموذج جاهز. اضغط «شغّل التحليل بكل المفاتيح».`);
+}
 function saveProvider(){
   const name = el('pName').value.trim();
   const base_url = el('pUrl').value.trim().replace(/\/$/,'');

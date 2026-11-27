@@ -26,6 +26,14 @@
   <button class="ghost" onclick="toggleSettings()">إعداد مفاتيح AI</button>
 </div>
 
+<div class="card" id="quickCard">
+  <h2>أسهل طريقة — مفتاح واحد بس</h2>
+  <p class="note">١. افتح <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> وسجّل (مجاني).<br>٢. اضغط <b>Create Key</b> وانسخ المفتاح.<br>٣. الصقه هنا واضغط الزر — الموقع هيضيف ١١ موديلاً مجانياً لوحده.</p>
+  <label>الصق مفتاح OpenRouter هنا<input id="quickKey" type="password" dir="ltr" autocomplete="off" placeholder="sk-or-..."></label>
+  <button onclick="quickSetup()">حفظ المفتاح وتشغيل كل النماذج المجانية</button>
+  <p class="note">المفتاح هيحفظ في متصفحك بس. متلصقوش هنا في الشات ولا في GitHub.</p>
+</div>
+
 <div class="card" id="settings" style="display:none">
   <h2>المزودون</h2>
   <div id="providerList"></div>
