@@ -36,4 +36,6 @@
 - `index.html`: أزرار التوسعة لكل مزود + شرح إن المفتاح لازم يتحفظ الأول.
 - استُبعد بعد الفحص: NVIDIA و SambaNova (مفيش CORS)، GitHub Models (مفيش CORS)، Hugging Face/Fireworks/Together/Chutes (مدفوعة أو برصيد محدود مش مجانية دايمة)، Cohere (صيغة chat غير متوافقة).
 - اختبار محلي: Node syntax ✅ + محاكاة expansion ✅ (11 نموذج من مفتاح OpenRouter واحد) + اختبار واجهة بالمتصفح ✅ (زرار شغال، عدّاد 1 مفتاح / 11 نموذج، صفر أخطاء console).
-- التالي: commit/push والتحقق من بناء Pages والنسخة الحية.
+- ✅ commit `4651b0e` اترفع، Pages حالة `built`، والنسخة الحية فيها الأزرار والدوال الجديدة.
+- ✅ فحص أسرار نهائي: مفيش مفاتيح في الريبو.
+- خلص المطلوب — الموقع جاهز: https://ahmedyoussefrezq.github.io/market-ai-web/
