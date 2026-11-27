@@ -189,5 +189,6 @@
 - ✅ اختبار محلي: toast عرض «تنبيه AI: XAUUSD / H1 · BUY · دخول 3670 · وقف 3655 · هدف 3690 / 3700»، auto analyze مع عدم وجود مزودات رجع null بدون أخطاء.
 - ✅ commit `6dbc57a` اترفع، Pages `built`، live `pro.js?v=10` بالكود الجديد.
 - ⚠️ صراحة: مراقبة لحظية (5 دق) شغالة فقط أثناء فتح التطبيق. iOS/أندرويد background sync مش مدعوم بدون مفاتيح في SW.
+- ✅ طلب المستخدم: «الصفحة دي الغيها» → حُذفت `index.html` (الصفحة الكلاسيكية) بالكامل، ورابطها من topbar، و`manifest.start_url` بقى `./pro.html`، و`sw.js` assets/fallback بقى pro.html بس. الكاش v12.
 - ✅ طلب المستخدم: إزالة OpenRouter (آخر إشارات في رسالة «لسه مفيش مفتاح» وplaceholder وتعليق) و إزالة «الشاشه الأولى» (greeting فارغ) — chat يبقى فارغاً حتى يسأل المستخدم. commit `?` will be added.
 - ✅ اختبار AI-centric (mock server): auto analyze استدعى AI، حفظ توصية (BUY/entry 3670.5/stop 3655.2/targets 3690/3705)، وأظهر toast «تنبيه AI: ...». التشغيل الثاني لم يُرسل إشعار (لا تغيير) — dedup يعمل. زر «توليد» (consensus) مع مزود واحد parse وحفظ التوصية بدون أخطاء.

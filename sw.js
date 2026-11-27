@@ -1,6 +1,6 @@
-const CACHE = 'market-ai-web-v11';
+const CACHE = 'market-ai-web-v12';
 // Relative to the service worker scope so it works on GitHub project Pages (/repo/).
-const ASSETS = ['./', './index.html', './pro.html', './style.css', './pro.css', './app.js',
+const ASSETS = ['./pro.html', './style.css', './pro.css', './app.js',
   './pro.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './apple-touch-icon.png', './data/market.json'];
 
@@ -37,7 +37,7 @@ self.addEventListener('fetch', e => {
       return r;
     }).catch(() => caches.match(req).then(hit => {
       if (hit) return hit;
-      if (req.mode === 'navigate') return caches.match(url.pathname.includes('pro.html') ? './pro.html' : './index.html');
+      if (req.mode === 'navigate') return caches.match('./pro.html');
       return Response.error();
     }))
   );
