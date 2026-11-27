@@ -14,7 +14,7 @@ const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد تحليل سوق. ق�
 7) إذا كانت البيانات قديمة/بها تحذيرات، اذكر ذلك أولاً.
 8) لو فيه web_search في السياق، ده بحث حقيقي في الإنترنت: اعتمد عليه للأخبار الحديثة، واذكر عنوان الخبر وتاريخه عند الاستناد له، ولو نتايجه فاضية قول إن مفيش أخبار حديثة متاحة. متخترعش أخبار مش موجودة فيه.
 9) الأخبار: المصدر الوحيد المسموح للبناء عليه هو web_search (بحث لحظي). أي شيء في archived_news أرشيف محفوظ بتاريخه — ذكره للسياق فقط، وممنوع تبني عليه توصية أو تقدّمه كخبر حديث. لو web_search فاضي، قول صراحة إن مفيش أخبار لحظية متاحة.
-10) لو quality_gate.pass=false، ممنوع تعطي BUY أو SELL: لازم WAIT أو شرح فقط، واذكر سبب الرفض (معامل الربح PF وعدد الصفقات المطلوب).`;
+10) لو quality_gate.pass=false، ممنوع تعطي BUY أو SELL: لازم WAIT أو شرح فقط، واذكر سبب الرفض (معامل الربح PF وعدد الصفقات المطلوب). التطبيق بيرفض أي رد فيه BUY/SELL على إعداد مرفوض.`;
 
 const PRO_PROMPTS = [
   'حلّل الأداة الحالية وأعطني توصية',
@@ -270,7 +270,7 @@ async function buildProContext(withBasics=true){
   try{
     const g=await ensureGate();
     ctx.quality_gate={pass:!!g.pass,pf:g.pf,trades:g.trades,minPF:g.minPF,minTrades:g.minTrades,
-      error:g.error||null,at:g.at||null};
+      bars:g.bars||null,source:g.source||null,error:g.error||null,at:g.at||null};
   }catch(e){}
 
   // Real internet search attached to the context the AI sees.
@@ -350,22 +350,48 @@ function startLiveTicker(){
 function stopLiveTicker(){ if(LIVE_TIMER){ clearInterval(LIVE_TIMER); LIVE_TIMER=null; } }
 
 /* ---------- backtest quality gate ---------- */
-function gateFromCandles(cs,symbol,tf){
+function gateFromCandles(cs,symbol,tf,source){
   const trades=backtest(cs), stats=stratStats(trades);
   return {symbol,tf,pass:stats.trades>=STRAT.minTrades && stats.profit_factor>=STRAT.minPF,
     trades:stats.trades,pf:stats.profit_factor,win_rate:stats.win_rate,max_dd:stats.max_dd,
-    total_r:stats.total_r,minTrades:STRAT.minTrades,minPF:STRAT.minPF,at:new Date().toISOString()};
+    total_r:stats.total_r,minTrades:STRAT.minTrades,minPF:STRAT.minPF,
+    bars:cs.length,source:source||null,at:new Date().toISOString()};
+}
+// Stitch the long saved history with the live candles, scaling the live leg to the
+// history's price basis so the seam doesn't look like a fake gap.
+function alignSeries(hist,live){
+  if(!hist||!hist.length) return live||[];
+  if(!live||!live.length) return hist;
+  const byT=new Map(hist.map(c=>[c.t,c.c]));
+  const ratios=[];
+  live.forEach(c=>{ const h=byT.get(c.t); if(h&&c.c) ratios.push(h/c.c); });
+  let factor=1;
+  if(ratios.length>=5){ ratios.sort((a,b)=>a-b); factor=ratios[Math.floor(ratios.length/2)]; }
+  const scaled=factor===1?live:live.map(c=>({...c,o:c.o*factor,h:c.h*factor,l:c.l*factor,c:c.c*factor}));
+  const map=new Map();
+  hist.forEach(c=>map.set(c.t,c));
+  scaled.forEach(c=>map.set(c.t,c));
+  return [...map.values()].sort((a,b)=>a.t-b.t);
+}
+async function gateCandles(symbol,tf){
+  let hist=null, live=null;
+  try{ const h=await loadHistory(symbol,tf); hist=h.candles; }catch(e){}
+  if(symbol==='XAUUSD' && PRO_CANDLES && PRO_CANDLES.length>=120 && PRO_CANDLES_TF===tf) live=PRO_CANDLES;
+  if(hist && hist.length>=100 && live && live.length) return {candles:alignSeries(hist,live),source:'history+live'};
+  if(hist && hist.length>=100) return {candles:hist,source:'history'};
+  if(live && live.length>=100) return {candles:live,source:'live'};
+  return {candles:null,source:'none'};
 }
 async function ensureGate(){
   const symbol=proEl('proSymbol')?.value||'XAUUSD', tf=proEl('proInterval')?.value||'H1';
   const key=symbol+':'+tf;
   if(GATE_CACHE.key===key && Date.now()-GATE_CACHE.at<10*60*1000) return GATE_CACHE.data;
-  let cs=(symbol==='XAUUSD' && PRO_CANDLES && PRO_CANDLES.length>=120 && PRO_CANDLES_TF===tf) ? PRO_CANDLES : null;
-  if(!cs){ try{ cs=(await loadHistory(symbol,tf)).candles; }catch(e){ cs=null; } }
-  if(!cs || cs.length<100){
-    return {symbol,tf,pass:false,trades:0,pf:0,error:'مفيش شموع كفاية للباكتيست',minPF:STRAT.minPF,minTrades:STRAT.minTrades};
+  const got=await gateCandles(symbol,tf);
+  if(!got.candles || got.candles.length<100){
+    return {symbol,tf,pass:false,trades:0,pf:0,bars:(got.candles||[]).length,source:got.source,
+      error:'مفيش شموع كفاية للباكتيست',minPF:STRAT.minPF,minTrades:STRAT.minTrades};
   }
-  const g=gateFromCandles(cs,symbol,tf);
+  const g=gateFromCandles(got.candles,symbol,tf,got.source);
   GATE_CACHE={key,at:Date.now(),data:g};
   return g;
 }
@@ -374,8 +400,30 @@ function renderGate(g){
   if(!g){ box.className='gate'; box.innerHTML=''; return; }
   box.className='gate '+(g.pass?'ok':'bad');
   box.innerHTML='<b>بوابة الباكتيست</b> · '+(g.pass?'مقبول ✅':'مرفوض ⛔')+
-    (g.error?(' · '+esc(g.error)):(' · PF '+esc(g.pf)+' · '+esc(g.trades)+' صفقة'))+
+    (g.error?(' · '+esc(g.error)):(' · PF '+esc(g.pf)+' · '+esc(g.trades)+' صفقة · '+esc(g.bars)+' شمعة'))+
     (g.pass?'':(' <i>المطلوب PF ≥ '+esc(g.minPF)+' و'+esc(g.minTrades)+' صفقة</i>'));
+}
+/* ---------- mandatory gate in chat ---------- */
+function wantsTradeDecision(t){
+  const s=String(t||'');
+  if(/\b(BUY|SELL|entry|stop|target)\b/i.test(s)) return true;
+  if(/(توصي|توصية|دخول|أدخل|ادخل|صفقة|إشارة|اشارة|هدف)/.test(s)) return true;
+  return /(?:^|\s)(شراء|أشتري|اشتري|بيع|أبيع|ابيع)(?=\s|$|[؟?،,.!])/.test(s);
+}
+function hasTradeCall(t){
+  return /\b(BUY|SELL)\b|(?:^|\s)(شراء|بيع)(?=\s|$)/i.test(t||'');
+}
+function gateBlockText(g){
+  const symbol=proEl('proSymbol')?.value||'XAUUSD', tf=proEl('proInterval')?.value||'H1';
+  return '⛔ **بوابة الباكتيست: مفيش توصية على '+symbol+' / '+tf+'**\n'+
+    (g.error?g.error:('معامل الربح '+g.pf+' · '+g.trades+' صفقة من '+g.bars+' شمعة'))+
+    ' — المطلوب PF ≥ '+g.minPF+' و'+g.minTrades+' صفقة.\n'+
+    'التفسير النصي مسموح، لكن BUY/SELL على الإعداد ده ممنوع. جرّب فريم أو أداة تانية.';
+}
+function enforceGateOnReply(txt,g){
+  if(!g || g.pass) return txt;
+  if(!hasTradeCall(txt)) return txt;
+  return gateBlockText(g)+'\n\n— اتلغى رد الموديل لأنه تضمّن توصية على إعداد مرفوض.';
 }
 
 /* ---------- internet search panel ---------- */
@@ -539,6 +587,13 @@ async function proSend(preset){
   if(!text) return;
   if(input) input.value='';
   err(''); proPush('user',text);
+  // Mandatory gate in chat too: a trade question on a weak setup is refused before any AI call.
+  const gate=await ensureGate();
+  renderGate(gate);
+  if(!gate.pass && wantsTradeDecision(text)){
+    proPush('bot',gateBlockText(gate),{model:'بوابة الجودة'});
+    return;
+  }
   const models=proActiveModels();
   if(!models.length){
     const msg='لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح (Groq/Gemini/Mistral/Cerebras/HF). المفتاح بيتحفظ في متصفح الهاتف بس، والتطبيق هيشتغل من غير أي كمبيوتر.';
@@ -573,7 +628,7 @@ async function proSend(preset){
         proUpdate(ids[k],partial,{model:p.name,at:proTime()});
       }).then(r=>{
         r.ok?markProviderOK(p):markProviderFail(p);
-        const final=r.ok?r.text:'تعذّر الحصول على رد من '+p.name+' — '+r.error;
+        const final=r.ok?enforceGateOnReply(r.text,gate):'تعذّر الحصول على رد من '+p.name+' — '+r.error;
         proUpdate(ids[k],final,{model:p.name,ms:r.ms,at:proTime()});
       })));
     }else{
@@ -589,7 +644,7 @@ async function proSend(preset){
         if(!r.ok) markProviderFail(next); else markProviderOK(next);
         used=next;
       }
-      const final=r.ok?r.text:'كل المزودات فشلت. آخر خطأ: '+r.error;
+      const final=r.ok?enforceGateOnReply(r.text,gate):'كل المزودات فشلت. آخر خطأ: '+r.error;
       proUpdate(id,final,{model:used.name,ms:r.ms,at:proTime()});
     }
   }catch(e){ err('خطأ: '+e.message); }
