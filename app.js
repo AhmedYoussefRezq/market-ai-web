@@ -31,6 +31,7 @@ const TEMPLATES = [
   {name:'gemini', base_url:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-3.5-flash-lite', api_key:'', enabled:true},
   {name:'mistral', base_url:'https://api.mistral.ai/v1', model:'mistral-small-latest', api_key:'', enabled:true},
   {name:'cerebras', base_url:'https://api.cerebras.ai/v1', model:'gpt-oss-120b', api_key:'', enabled:true},
+  {name:'huggingface', base_url:'https://router.huggingface.co/v1', model:'openai/gpt-oss-120b', api_key:'', enabled:true},
   {name:'openai', base_url:'https://api.openai.com/v1', model:'gpt-4o-mini', api_key:'', enabled:true},
   {name:'custom', base_url:'', model:'', api_key:'', enabled:true}
 ];
@@ -49,6 +50,16 @@ const FREE_MODEL_SETS = {
   ]},
   cerebras:{label:'Cerebras', base:'https://api.cerebras.ai/v1', models:[
     'gpt-oss-120b','qwen-3.8-27b'
+  ]},
+  gemini:{label:'Google Gemini', base:'https://generativelanguage.googleapis.com/v1beta/openai', models:[
+    'gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-3.8-flash','gemini-4-hydrogen'
+  ]},
+  huggingface:{label:'Hugging Face', base:'https://router.huggingface.co/v1', models:[
+    'openai/gpt-oss-120b','Qwen/Qwen3.8-27B','deepseek-ai/DeepSeek-V4.1-Flash-1017',
+    'meta-llama/Llama-3.1-8B-Instruct'
+  ]},
+  mistral:{label:'Mistral', base:'https://api.mistral.ai/v1', models:[
+    'mistral-small-latest','mistral-medium-latest','mistral-large-latest'
   ]}
 };
 

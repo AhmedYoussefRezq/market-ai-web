@@ -67,6 +67,15 @@
       <p class="note tiny">أو مفتاح Cerebras:</p>
       <label>مفتاح Cerebras<input id="cerebrasKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"></label>
       <button class="ghost" onclick="proQuickProvider('cerebras')">حفظ وتفعيل موديلات Cerebras</button>
+      <p class="note tiny">أو مفتاح Google Gemini المجاني من <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>:</p>
+      <label>مفتاح Gemini<input id="geminiKey" type="password" dir="ltr" autocomplete="off" placeholder="AIza..."></label>
+      <button class="ghost" onclick="proQuickProvider('gemini')">حفظ وتفعيل موديلات Gemini</button>
+      <p class="note tiny">أو توكن Hugging Face بصلاحية Inference Providers من <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a>:</p>
+      <label>توكن Hugging Face<input id="hfKey" type="password" dir="ltr" autocomplete="off" placeholder="hf_..."></label>
+      <button class="ghost" onclick="proQuickProvider('huggingface')">حفظ وتفعيل موديلات Hugging Face</button>
+      <p class="note tiny">أو مفتاح Mistral من <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener">console.mistral.ai/api-keys</a>:</p>
+      <label>مفتاح Mistral<input id="mistralKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"></label>
+      <button class="ghost" onclick="proQuickProvider('mistral')">حفظ وتفعيل موديلات Mistral</button>
       <p class="note" id="quickMsg"></p>
       <button class="ghost" onclick="proKeyAction('status')">حالة الحفظ</button>
       <div class="row"><span class="k">مفاتيح محفوظة</span><span class="v" id="keyCount">0</span></div>
@@ -95,7 +104,7 @@
     </div>
     <p class="note tiny">
       هذا التطبيق <b>تحليل فقط</b>: ما بيبعتش أي أمر، وما بيديرش فلوس. الأسعار من مصادر عامة وقد تكون متأخرة.
-      الردود محتاجة <b>مفتاح AI مجاني</b> من <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> — بيتحفظ في متصفحك بس.
+      الردود محتاجة <b>مفتاح AI</b> من OpenRouter أو Groq أو Gemini أو Hugging Face (كلهم ليهم مجاني) — بيتحفظ في متصفحك بس.
       الـ AI ممكن يغلط — راجع الأرقام بنفسك، ومفيش أي ضمان ربح.
     </p>
   </main>

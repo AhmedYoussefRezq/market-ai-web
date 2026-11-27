@@ -107,7 +107,8 @@ function proConnect(){
 }
 function proQuickProvider(source){
   if(source==='openrouter'){ quickSetup(); proFillModels(); return; }
-  const ids={groq:'groqKey',cerebras:'cerebrasKey'}, set=FREE_MODEL_SETS[source];
+  const ids={groq:'groqKey',cerebras:'cerebrasKey',gemini:'geminiKey',
+    huggingface:'hfKey',mistral:'mistralKey'}, set=FREE_MODEL_SETS[source];
   if(!set) return;
   const input=proEl(ids[source]), key=(input?.value||'').trim();
   if(!key){ err('الصق المفتاح الأول من '+set.label); return; }
