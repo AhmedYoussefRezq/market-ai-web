@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css?v=10">
-<link rel="stylesheet" href="pro.css?v=2">
+<link rel="stylesheet" href="pro.css?v=3">
 </head>
 <body class="pro">
 
@@ -69,9 +69,16 @@
       <div class="panel-head"><svg class="ico"><use href="#i-chart"/></svg><h2>سياق التحليل</h2><span class="mini-tag">CONTEXT</span></div>
       <p class="stamp" id="ctxStamp">لسه مفيش بيانات — اكتب سؤال أو اضغط «تحديث البيانات».</p>
       <div id="ctxInd" class="chips"></div>
+      <div id="ctxChart" class="ctx-chart"></div>
       <div class="subhead">الاستراتيجية المختبرة</div>
       <div id="ctxStrat" class="tiny"></div>
       <p class="warn" id="ctxWarnings"></p>
+    </section>
+
+    <section class="panel rec-panel">
+      <div class="panel-head"><svg class="ico"><use href="#i-check"/></svg><h2>التوصية الحالية</h2></div>
+      <div id="recOut" class="rec-out"><p class="note tiny">اضغط «أنشئ توصية» عشان الموديل يطلع دخول ووقف وهدف من البيانات الحالية.</p></div>
+      <button class="soft-btn" id="recBtn" onclick="proRecommend()"><svg class="ico"><use href="#i-bolt"/></svg> أنشئ توصية</button>
     </section>
 
     <section class="panel">
@@ -161,6 +168,6 @@
 </div>
 
 <script src="app.js?v=11"></script>
-<script src="pro.js?v=3"></script>
+<script src="pro.js?v=5"></script>
 </body>
 </html>

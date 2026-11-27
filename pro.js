@@ -3,6 +3,7 @@
 
 const PRO_CHAT_KEY = 'market-ai-pro-chat-v1';
 const PRO_PREF_KEY = 'market-ai-pro-prefs-v1';
+const PRO_REC_KEY = 'market-ai-pro-rec-v1';
 const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد أبحاث تداول محترف. قواعدك الصارمة:
 1) استخدم فقط البيانات المرفقة في السياق (JSON). لا تخترع أسعاراً أو أخباراً أو أرقاماً أو تواريخ. لو معلومة غير موجودة قل «غير متوفرة في البيانات المرفقة».
 2) أجب بالعربية المصرية، باختصار ووضوح، بعناوين ونقاط قصيرة. لا وعود ربح، ولا توصية نهائية بالشراء أو البيع.
@@ -231,6 +232,28 @@ async function buildProContext(){
 
   return ctx;
 }
+function emaSeries(vals,p){
+  const k=2/(p+1); let e=vals[0]; const out=[e];
+  for(let i=1;i<vals.length;i++){ e=vals[i]*k+e*(1-k); out.push(e); }
+  return out;
+}
+function drawCtxChart(symbol,tf){
+  const box=proEl('ctxChart'); if(!box) return;
+  const useTf=['D1','H4','H1'].includes(tf)?tf:'D1';
+  loadHistory(symbol,useTf).then(h=>{
+    const cs=h.candles.slice(-60), cl=cs.map(c=>c.c);
+    if(cl.length<20){ box.innerHTML=''; return; }
+    const e20=emaSeries(cl,20), e50=emaSeries(cl,50);
+    const all=[...cl,...e20,...e50], min=Math.min(...all), max=Math.max(...all), span=max-min||1;
+    const w=300,hgt=70,pad=4;
+    const line=a=>a.map((v,i)=>((pad+i*(w-2*pad)/(a.length-1)).toFixed(1)+','+(pad+(max-v)*(hgt-2*pad)/span).toFixed(1))).join(' ');
+    box.innerHTML='<svg viewBox="0 0 '+w+' '+hgt+'" preserveAspectRatio="none">'+
+      '<polyline points="'+line(cl)+'" fill="none" stroke="#2dd4bf" stroke-width="1.6"/>'+
+      '<polyline points="'+line(e20)+'" fill="none" stroke="#f0b64a" stroke-width="1" opacity=".8"/>'+
+      '<polyline points="'+line(e50)+'" fill="none" stroke="#5aa9ff" stroke-width="1" opacity=".6"/>'+
+      '</svg>';
+  }).catch(()=>{ box.innerHTML=''; });
+}
 async function refreshContext(){
   const btn=proEl('ctxBtn'), stamp=proEl('ctxStamp');
   if(btn) btn.disabled=true;
@@ -242,6 +265,7 @@ async function refreshContext(){
       (m.source_snapshot||PRO_CTX.generated_at)+(m.error?' · '+m.error:'');
     const ind=proEl('ctxInd');
     if(ind) ind.innerHTML=renderIndicators(m).replace(/undefined/g,'-');
+    drawCtxChart(PRO_CTX.instrument,PRO_CTX.timeframe);
     const rs=PRO_CTX.rule_strategy||{};
     const s=proEl('ctxStrat');
     if(s) s.innerHTML=rs.error?esc(rs.error):
@@ -250,6 +274,49 @@ async function refreshContext(){
     if(w) w.textContent=(m.warnings||[]).length?'تحذيرات البيانات: '+m.warnings.join(' · '):'';
   }catch(e){ if(stamp) stamp.textContent='خطأ في تحديث السياق: '+e.message; }
   finally{ if(btn) btn.disabled=false; }
+}
+
+/* ---------- structured recommendation ---------- */
+function proLoadRec(){
+  try{ return JSON.parse(localStorage.getItem(PRO_REC_KEY)||'null'); }catch(e){ return null; }
+}
+function proSaveRec(r){ try{ localStorage.setItem(PRO_REC_KEY,JSON.stringify(r)); }catch(e){} }
+function renderRec(r){
+  const out=proEl('recOut'); if(!out) return;
+  if(!r){ out.innerHTML='<p class="note tiny">اضغط «أنشئ توصية» عشان الموديل يطلع دخول ووقف وهدف من البيانات الحالية.</p>'; return; }
+  const dir=String(r.bias||'WAIT').toUpperCase();
+  const cls=['BUY','SELL','WAIT'].includes(dir)?dir.toLowerCase():'wait';
+  const targets=Array.isArray(r.targets)?r.targets.join(' / '):fmt(r.targets);
+  out.innerHTML=[
+    ['الاتجاه','<b class="rec-dir '+cls+'">'+esc(dir)+'</b>'],
+    ['الدخول',esc(fmt(r.entry))],['الوقف',esc(fmt(r.stop))],['الأهداف',esc(targets)],
+    ['العائد/المخاطرة',esc(fmt(r.rr))],
+    ['الشروط',esc(fmt(r.conditions||r.wait_conditions))],
+    ['تحذير',esc(fmt(r.risk||r.risk_note))]
+  ].map(x=>'<div class="rec-row"><span>'+x[0]+'</span>'+x[1]+'</div>').join('');
+}
+async function proRecommend(){
+  if(PRO_BUSY) return;
+  const btn=proEl('recBtn'); if(btn) btn.disabled=true;
+  err('');
+  const chosen=proActiveModels()[0];
+  const all=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model);
+  const models=(chosen?[chosen,...all.filter(p=>p!==chosen)]:all).slice(0,3);
+  if(!models.length){ proConnect(); if(btn) btn.disabled=false; return; }
+  if(!PRO_CTX||Date.now()-PRO_CTX_AT>10*60*1000){
+    try{ PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now(); refreshContext(); }catch(e){}
+  }
+  const q='أعطني توصية عملية مبنية على السياق المرفق فقط. أرجع JSON فقط بالحقول: bias (BUY أو SELL أو WAIT)، entry، stop، targets (مصفوفة)، rr، conditions، risk. مفيش وعود ربح.';
+  const messages=[{role:'system',content:PRO_SYSTEM+' أرجع JSON فقط بالحقول المطلوبة، بدون أي نص إضافي.'},
+    {role:'user',content:JSON.stringify({question:q,context:PRO_CTX})}];
+  let rec=null;
+  for(const p of models.slice(0,3)){
+    const r=await proCallChat(p,messages,null);
+    if(r.ok){ const o=parseJSON(r.text); if(o&&o.bias){ rec=o; rec._model=p.name; break; } }
+  }
+  if(rec){ proSaveRec(rec); renderRec(rec); err('اتعملت توصية جديدة من '+rec._model+'.'); }
+  else err('ما قدرتش أطلع توصية — جرّب تاني بعد ما تربط مزود شغال.');
+  if(btn) btn.disabled=false;
 }
 
 /* ---------- chat engine ---------- */
@@ -323,12 +390,28 @@ async function proSend(preset){
     return id;
   });
   try{
-    await Promise.all(models.map((p,k)=>proCallChat(p,messages,partial=>{
-      proUpdate(ids[k],partial,{model:p.name,at:proTime()});
-    }).then(r=>{
-      const final=r.ok?r.text:'تعذّر الحصول على رد من '+p.name+' — '+r.error;
-      proUpdate(ids[k],final,{model:p.name,ms:r.ms,at:proTime()});
-    })));
+    if(models.length>1){
+      await Promise.all(models.map((p,k)=>proCallChat(p,messages,partial=>{
+        proUpdate(ids[k],partial,{model:p.name,at:proTime()});
+      }).then(r=>{
+        const final=r.ok?r.text:'تعذّر الحصول على رد من '+p.name+' — '+r.error;
+        proUpdate(ids[k],final,{model:p.name,ms:r.ms,at:proTime()});
+      })));
+    }else{
+      const all=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model);
+      const p=models[0], id=ids[0];
+      const fallbacks=all.filter(x=>x.base_url!==p.base_url||x.model!==p.model).slice(0,3);
+      let r=await proCallChat(p,messages,partial=>proUpdate(id,partial,{model:p.name,at:proTime()}));
+      let used=p, tries=0;
+      while(!r.ok&&tries<fallbacks.length){
+        const next=fallbacks[tries++];
+        proUpdate(id,'⚠️ '+p.name+' فشل ('+r.error+') — جاري التجربة مع '+next.name+'...',{model:next.name,at:proTime()});
+        r=await proCallChat(next,messages,partial=>proUpdate(id,partial,{model:next.name,at:proTime()}));
+        used=next;
+      }
+      const final=r.ok?r.text:'كل المزودات فشلت. آخر خطأ: '+r.error;
+      proUpdate(id,final,{model:used.name,ms:r.ms,at:proTime()});
+    }
   }catch(e){ err('خطأ: '+e.message); }
   finally{
     PRO_BUSY=false;
@@ -349,6 +432,7 @@ function proInit(){
   if(q) q.innerHTML=PRO_PROMPTS.map(x=>'<button onclick="proSend(this.querySelector(\'span\').textContent)">'+
     '<svg class="ico"><use href="#i-bolt"/></svg><span>'+esc(x)+'</span></button>').join('');
   proRenderChat();
+  renderRec(proLoadRec());
   const input=proEl('proInput');
   if(input) input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); proSend(); } });
   [proEl('proSymbol'),proEl('proInterval'),proEl('proModel'),proEl('proConsensus')].forEach(n=>{

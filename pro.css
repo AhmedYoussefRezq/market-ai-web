@@ -82,12 +82,25 @@ button:disabled,.soft-btn:disabled{opacity:.55;cursor:not-allowed}
   border:1px solid var(--line);border-radius:6px;padding:2px 6px}
 .stamp{font-size:11px;color:var(--dim);margin:0 0 8px;line-height:1.6}
 .subhead{font-size:10.5px;letter-spacing:.4px;color:var(--gold);margin:13px 0 5px;font-weight:800}
+.ctx-chart{margin:8px 0 2px;height:72px;background:#080f17;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ctx-chart svg{width:100%;height:100%;display:block}
 .tiny{font-size:11.5px;color:var(--dim)}
 .note{font-size:11.5px;color:var(--dim);line-height:1.7}
 .warn{color:var(--gold);font-size:11px;margin:10px 0 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .chip{background:#0a1018;border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:11px;color:var(--dim)}
 .chip b{color:var(--txt)}
+.rec-panel .soft-btn{width:100%;margin-top:9px}
+.rec-out{margin-top:4px}
+.rec-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;
+  border-bottom:1px solid var(--line);font-size:11.5px}
+.rec-row:last-child{border-bottom:0}
+.rec-row span{color:var(--dim)}
+.rec-row b{color:var(--txt);text-align:left;word-break:break-word}
+.rec-dir{padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:800}
+.rec-dir.buy{color:var(--green);background:rgba(61,220,151,.12)}
+.rec-dir.sell{color:var(--red);background:rgba(242,114,111,.12)}
+.rec-dir.wait{color:var(--gold);background:rgba(240,182,74,.12)}
 .prompt-list{display:flex;flex-direction:column;gap:6px}
 .prompt-list button{width:100%;justify-content:flex-start;text-align:right;gap:8px;padding:10px 11px;
   background:#0a1018;border:1px solid var(--line);color:var(--txt);font-size:12px;font-weight:600;line-height:1.5}
