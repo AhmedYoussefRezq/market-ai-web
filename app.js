@@ -282,6 +282,249 @@ function indicators(cs){
     low20:+Math.min(...cs.slice(-20).map(x=>x.l)).toFixed(4), bars:cs.length,
     trend: (e20&&s50)?(e20>s50&&last>e20?'bullish':e20<s50&&last<e20?'bearish':'mixed'):'unknown'};
 }
+/* ---------- rule-based strategy + real backtest (no AI) ---------- */
+const STRAT = {fast:20, slow:50, rsi:14, atr:14, sl:2, tp:4, cost:0.00005, minTrades:20, minPF:1.2};
+const HISTORY_CACHE = {};
+
+function stratSeries(cs){
+  const n=cs.length;
+  const emaF=new Array(n).fill(null), emaS=new Array(n).fill(null),
+        rsiA=new Array(n).fill(null), atrA=new Array(n).fill(null);
+  if(!n) return {emaF,emaS,rsiA,atrA};
+  let ef=cs[0].c, es=cs[0].c;
+  const kf=2/(STRAT.fast+1), ks=2/(STRAT.slow+1);
+  for(let i=0;i<n;i++){
+    if(i){ ef=cs[i].c*kf+ef*(1-kf); es=cs[i].c*ks+es*(1-ks); }
+    emaF[i]=ef; emaS[i]=es;
+  }
+  const p=STRAT.rsi;
+  if(n>p){
+    let g=0,l=0;
+    for(let i=1;i<=p;i++){ const d=cs[i].c-cs[i-1].c; g+=Math.max(d,0); l+=Math.max(-d,0); }
+    g/=p; l/=p; rsiA[p]=l===0?100:100-100/(1+g/l);
+    for(let i=p+1;i<n;i++){
+      const d=cs[i].c-cs[i-1].c;
+      g=(g*(p-1)+Math.max(d,0))/p; l=(l*(p-1)+Math.max(-d,0))/p;
+      rsiA[i]=l===0?100:100-100/(1+g/l);
+    }
+  }
+  const ap=STRAT.atr;
+  if(n>ap){
+    const tr=i=>Math.max(cs[i].h-cs[i].l, Math.abs(cs[i].h-cs[i-1].c), Math.abs(cs[i].l-cs[i-1].c));
+    let sum=0; for(let i=1;i<=ap;i++) sum+=tr(i);
+    atrA[ap]=sum/ap;
+    for(let i=ap+1;i<n;i++) atrA[i]=(atrA[i-1]*(ap-1)+tr(i))/ap;
+  }
+  return {emaF,emaS,rsiA,atrA};
+}
+
+function backtest(cs){
+  const n=cs.length, {emaF,emaS,rsiA,atrA}=stratSeries(cs);
+  const trades=[]; let pos=null;
+  const cost=p=>p*STRAT.cost;
+  function close(i,exit,reason){
+    const risk=pos.side==='BUY'?pos.entry-pos.sl:pos.sl-pos.entry;
+    const r=pos.side==='BUY'?(exit-pos.entry)/risk:(pos.entry-exit)/risk;
+    trades.push({side:pos.side,entry:+pos.entry.toFixed(4),exit:+exit.toFixed(4),
+      sl:+pos.sl.toFixed(4),tp:+pos.tp.toFixed(4),r:+r.toFixed(3),
+      bars:i-pos.i,reason,t:cs[pos.i].t});
+    pos=null;
+  }
+  for(let i=STRAT.slow+2;i<n-1;i++){
+    if(pos && i>=pos.i){
+      const b=cs[i], long=pos.side==='BUY';
+      const hitSL=long?b.l<=pos.sl:b.h>=pos.sl;
+      const hitTP=long?b.h>=pos.tp:b.l<=pos.tp;
+      if(hitSL||hitTP){
+        let exit=hitSL?pos.sl:pos.tp;
+        if(hitSL&&(long?b.o<pos.sl:b.o>pos.sl)) exit=b.o;
+        close(i,exit,hitSL?'SL':'TP');
+      }else{
+        const fade=long?(rsiA[i-1]>=50&&rsiA[i]<50):(rsiA[i-1]<=50&&rsiA[i]>50);
+        const flip=long?emaF[i]<emaS[i]:emaF[i]>emaS[i];
+        if(fade||flip) close(i,b.c,fade?'RSI':'EMA');
+      }
+    }
+    if(!pos && rsiA[i-1]!==null && rsiA[i]!==null && atrA[i]){
+      const up=rsiA[i-1]<=50&&rsiA[i]>50, dn=rsiA[i-1]>=50&&rsiA[i]<50;
+      const next=cs[i+1];
+      if(up&&emaF[i]>emaS[i]){
+        const entry=next.o+cost(next.o);
+        pos={side:'BUY',i:i+1,entry,sl:entry-STRAT.sl*atrA[i],tp:entry+STRAT.tp*atrA[i]};
+      }else if(dn&&emaF[i]<emaS[i]){
+        const entry=next.o-cost(next.o);
+        pos={side:'SELL',i:i+1,entry,sl:entry+STRAT.sl*atrA[i],tp:entry-STRAT.tp*atrA[i]};
+      }
+    }
+  }
+  if(pos) close(n-1,cs[n-1].c,'END');
+  return trades;
+}
+
+function stratStats(trades){
+  const n=trades.length;
+  const wins=trades.filter(t=>t.r>0), losses=trades.filter(t=>t.r<=0);
+  const gw=wins.reduce((a,t)=>a+t.r,0), gl=Math.abs(losses.reduce((a,t)=>a+t.r,0));
+  let cum=0,peak=0,dd=0; const curve=[0];
+  trades.forEach(t=>{cum+=t.r; peak=Math.max(peak,cum); dd=Math.max(dd,peak-cum); curve.push(+cum.toFixed(3));});
+  return {trades:n,wins:wins.length,losses:losses.length,
+    win_rate:n?+(wins.length/n*100).toFixed(1):0,
+    total_r:+cum.toFixed(2), avg_r:n?+(cum/n).toFixed(2):0,
+    profit_factor:gl?+(gw/gl).toFixed(2):(gw?99:0),
+    max_dd:+dd.toFixed(2),
+    best:n?+Math.max(...trades.map(t=>t.r)).toFixed(2):0,
+    worst:n?+Math.min(...trades.map(t=>t.r)).toFixed(2):0,
+    avg_bars:n?+(trades.reduce((a,t)=>a+t.bars,0)/n).toFixed(1):0,
+    curve};
+}
+
+async function loadHistory(symbol, tf){
+  const key=symbol+':'+tf;
+  if(HISTORY_CACHE[key]) return HISTORY_CACHE[key];
+  let raw=null;
+  try{ raw=await getJSON('data/history/'+symbol+'.json',25000); }catch(e){}
+  const toC=arr=>arr.map(a=>({t:a[0],o:a[1],h:a[2],l:a[3],c:a[4]}));
+  let cs=[], source='history';
+  if(raw){
+    if(tf==='H4' && raw.H1 && raw.H1.length) cs=resample(toC(raw.H1),4);
+    else if(raw[tf]) cs=toC(raw[tf]);
+  }
+  if(cs.length<120){
+    try{ cs=await fetchCandles(symbol,tf); source='live'; }catch(e){}
+  }
+  if(cs.length<120) throw new Error('مفيش بيانات تاريخية كفاية للأداة/الفريم ده. جرّب D1 أو أداة تانية.');
+  const out={candles:cs,source,generated_at:(raw&&raw.generated_at)||null};
+  HISTORY_CACHE[key]=out;
+  return out;
+}
+
+function stratSignal(cs){
+  const n=cs.length; if(n<60) return null;
+  const {emaF,emaS,rsiA,atrA}=stratSeries(cs); const i=n-1;
+  if(rsiA[i]===null||!atrA[i]) return null;
+  const up=rsiA[i-1]<=50&&rsiA[i]>50;
+  const dn=rsiA[i-1]>=50&&rsiA[i]<50;
+  let bias='WAIT';
+  if(up&&emaF[i]>emaS[i]) bias='BUY';
+  else if(dn&&emaF[i]<emaS[i]) bias='SELL';
+  const last=cs[i].c, a=atrA[i], entry=+last.toFixed(4);
+  const sl=bias==='BUY'?+(entry-STRAT.sl*a).toFixed(4):bias==='SELL'?+(entry+STRAT.sl*a).toFixed(4):null;
+  const tp=bias==='BUY'?+(entry+STRAT.tp*a).toFixed(4):bias==='SELL'?+(entry-STRAT.tp*a).toFixed(4):null;
+  const trend=emaF[i]>emaS[i]?'صاعد':'هابط';
+  const reasons=[
+    `RSI14 = ${rsiA[i].toFixed(1)} (${rsiA[i]>50?'فوق 50':'تحت 50'})`,
+    `EMA20 ${emaF[i]>emaS[i]?'فوق':'تحت'} EMA50 → اتجاه ${trend}`,
+    `ATR14 = ${a.toFixed(4)} → الوقف ${STRAT.sl}×ATR والهدف ${STRAT.tp}×ATR`
+  ];
+  return {bias,entry,sl,tp,atr:+a.toFixed(4),rsi:+rsiA[i].toFixed(1),
+    ema20:+emaF[i].toFixed(4),ema50:+emaS[i].toFixed(4),trend,reasons,last_t:cs[i].t,rr:STRAT.tp/STRAT.sl};
+}
+
+function equitySvg(curve){
+  if(!curve||curve.length<2) return '<p class="note">مفيش بيانات كفاية.</p>';
+  const w=600,h=140,pad=10;
+  const min=Math.min(...curve,0), max=Math.max(...curve,0);
+  const span=max-min||1;
+  const x=i=>pad+i*(w-2*pad)/(curve.length-1);
+  const y=v=>pad+(max-v)*(h-2*pad)/span;
+  const pts=curve.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const zero=y(0).toFixed(1);
+  return `<svg viewBox="0 0 ${w} ${h}" class="equity" preserveAspectRatio="none">
+    <line x1="${pad}" y1="${zero}" x2="${w-pad}" y2="${zero}" stroke="#28313d" stroke-width="1"/>
+    <polyline points="${pts}" fill="none" stroke="${curve[curve.length-1]>=0?'#43c77a':'#f2685e'}" stroke-width="2.5"/>
+  </svg>`;
+}
+
+var LAST_STRAT=null;
+function renderStrategy(symbol,tf,hist,trades,stats,signal){
+  LAST_STRAT={symbol,tf,stats,signal};
+  const s=stats;
+  const quality=s.profit_factor>=1.5&&s.trades>=STRAT.minTrades?'جيدة':s.profit_factor>=STRAT.minPF&&s.trades>=STRAT.minTrades?'مقبولة':'ضعيفة';
+  const weak=s.trades<STRAT.minTrades||s.profit_factor<STRAT.minPF;
+  el('stratStats').innerHTML=[
+    ['صفقات',s.trades],['نسبة النجاح',s.win_rate+'%'],['معامل الربح',s.profit_factor],
+    ['إجمالي R',s.total_r],['أقصى تراجع',s.max_dd+'R'],['متوسط R',s.avg_r]
+  ].map(([k,v])=>`<span class="chip">${esc(k)}: <b>${esc(v)}</b></span>`).join('');
+  const b=signal;
+  const badge=b?b.bias:'WAIT';
+  el('stratSignal').innerHTML=`
+    <div class="row"><span class="k">الإشارة الحالية</span><span class="badge ${badge==='BUY'?'buy':badge==='SELL'?'sell':'wait'}">${badge}</span></div>
+    ${b&&b.bias!=='WAIT'?`
+      <div class="row"><span class="k">الدخول</span><span class="v">${fmt(b.entry)}</span></div>
+      <div class="row"><span class="k">الوقف</span><span class="v">${fmt(b.sl)}</span></div>
+      <div class="row"><span class="k">الهدف</span><span class="v">${fmt(b.tp)}</span></div>
+      <div class="row"><span class="k">العائد/المخاطرة</span><span class="v">1:${b.rr}</span></div>`:''}
+    <div class="row"><span class="k">جودة الاختبار</span><span class="v">${quality} (PF ${s.profit_factor})</span></div>
+    <ul>${(b?b.reasons:[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+    ${weak?'<p class="err">تحذير: عدد الصفقات أو معامل الربح ضعيف على الأداة/الفريم ده — الأفضل متتداولش عليه.</p>':''}
+    <p class="note">${b&&b.bias==='WAIT'?'مفيش تقاطع جديد دلوقتي — الاستراتيجية بتستنى إشارة واضحة ومبتدخلش في نص الحركة.':'الإشارة دي قواعد ثابتة، مش رأي AI.'}</p>`;
+  el('equityChart').innerHTML=equitySvg(s.curve);
+  el('stratTrades').innerHTML=trades.slice(-6).reverse().map(t=>`
+    <div class="provider"><b class="${t.r>0?'pos':'neg'}">${t.r>0?'+':''}${t.r}R</b> · ${t.side==='BUY'?'شراء':'بيع'} · ${t.reason}
+      <div class="tiny">دخول ${t.entry} · خروج ${t.exit} · ${t.bars} شمعة</div></div>`).join('')||'<p class="note">مفيش صفقات كفاية.</p>';
+  el('stratMsg').textContent=`${symbol} · ${tf} · ${hist.candles.length} شمعة (${hist.source==='history'?'بيانات محفوظة':'بيانات لحظية'}) — ${s.trades} صفقة تاريخية.`;
+  calcRisk();
+}
+
+async function runStrategy(){
+  const btn=el('stratBtn'); if(btn.disabled) return;
+  const symbol=el('stratSymbol').value, tf=el('stratTf').value;
+  btn.disabled=true; btn.textContent='جاري الاختبار...';
+  el('stratMsg').textContent='بجيب البيانات وأشغّل الباكتيست...';
+  try{
+    const hist=await loadHistory(symbol,tf);
+    const trades=backtest(hist.candles);
+    if(trades.length<5) throw new Error('الصفقات التاريخية قليلة جداً على الفريم ده — جرّب D1.');
+    const stats=stratStats(trades);
+    const signal=stratSignal(hist.candles);
+    renderStrategy(symbol,tf,hist,trades,stats,signal);
+  }catch(e){ el('stratMsg').textContent='خطأ: '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='شغّل الاستراتيجية'; }
+}
+
+const CONTRACT={
+  XAUUSD:{unit:'لوت',perPoint:100,note:'1 لوت = 100 أونصة'},
+  XAGUSD:{unit:'لوت',perPoint:5000,note:'1 لوت = 5000 أونصة'},
+  EURUSD:{unit:'لوت',perPoint:100000,pip:0.0001,pipValue:10,note:'1 لوت = 100,000 يورو'},
+  GBPUSD:{unit:'لوت',perPoint:100000,pip:0.0001,pipValue:10,note:'1 لوت = 100,000 جنيه'},
+  USDJPY:{unit:'لوت',perPoint:100000,pip:0.01,note:'قيمة النقطة بتتغير مع السعر'},
+  BTCUSD:{unit:'وحدة',perPoint:1,note:'حسب بروكرك'},
+  ETHUSD:{unit:'وحدة',perPoint:1,note:'حسب بروكرك'},
+  US500:{unit:'عقد',perPoint:1,note:'1 عقد ≈ $1 للنقطة'},
+  US30:{unit:'عقد',perPoint:1,note:'1 عقد ≈ $1 للنقطة'},
+  NAS100:{unit:'عقد',perPoint:1,note:'1 عقد ≈ $1 للنقطة'},
+  VIX:{unit:'عقد',perPoint:1,note:'تقديري'},
+  DXY:{unit:'عقد',perPoint:1,note:'تقديري'},
+  US10Y:{unit:'عقد',perPoint:1,note:'تقديري'},
+  WTI:{unit:'عقد',perPoint:1,note:'1 عقد = 1000 برميل تقريباً'}
+};
+function calcRisk(){
+  const out=el('riskOut'); if(!out) return;
+  const st=LAST_STRAT;
+  if(!st||!st.signal||st.signal.bias==='WAIT'){ out.textContent='شغّل الاستراتيجية الأول عشان تطلع إشارة، وبعدين احسب الحجم.'; return; }
+  const acct=Number(el('acctSize').value)||0;
+  const pct=Number(el('riskPct').value)||0;
+  if(acct<=0||pct<=0){ out.textContent='اكتب رأس المال ونسبة المخاطرة (أكبر من صفر).'; return; }
+  const sig=st.signal, dist=Math.abs(sig.entry-sig.sl);
+  const spec=CONTRACT[st.symbol]||{unit:'وحدة',perPoint:1,note:'تقديري'};
+  const riskAmt=acct*pct/100;
+  let size, formula;
+  if(spec.pip){
+    const pips=dist/spec.pip;
+    const pipVal=spec.pipValue||(1000/sig.entry);
+    size=riskAmt/(pips*pipVal);
+    formula=`${pips.toFixed(1)} نقطة × $${pipVal.toFixed(2)} للنقطة`;
+  }else{
+    size=riskAmt/(dist*spec.perPoint);
+    formula=`${dist.toFixed(4)} حركة × $${spec.perPoint} للنقطة`;
+  }
+  const dec=size<0.01?4:2;
+  out.innerHTML=`المخاطرة: <b>$${riskAmt.toFixed(2)}</b> · مسافة الوقف: <b>${dist.toFixed(4)}</b><br>
+    الحجم المقترح: <b>${size.toFixed(dec)} ${spec.unit}</b> (${formula})<br>
+    ${spec.unit==='لوت'&&size<0.01?'<span class="err">الحجم أقل من 0.01 لوت — قلل نسبة المخاطرة أو زود رأس المال أو استخدم حساب ميكرو.</span><br>':''}
+    <span class="tiny">${spec.note} — تقديري، راجع بروكرك.</span>`;
+}
+
 async function fetchNews(query, limit){
   const cacheKey='n:'+query; const hit=cacheGet(cacheKey); if(hit) return hit;
   let items=[];
@@ -459,12 +702,13 @@ async function analyze(){
     const results=await Promise.all(active.map(p=>callModel(p,messages)));
     renderResult(aggregate(results,snap));
   }catch(e){ err('خطأ: '+e.message); }
-  finally{ el('loading').style.display='none'; el('runBtn').disabled=false; el('runBtn').textContent='شغّل التحليل بكل المفاتيح'; }
+  finally{ el('loading').style.display='none'; el('runBtn').disabled=false; el('runBtn').textContent='اسأل النماذج (اختياري)'; }
 }
 function init(){
-  const sel=el('symbol');
-  sel.innerHTML=Object.entries(SYMBOLS).map(([k,v])=>`<option value="${k}">${esc(v.label)} (${esc(v.kind)})</option>`).join('');
-  sel.value='XAUUSD'; renderProviders();
+  const options=Object.entries(SYMBOLS).map(([k,v])=>`<option value="${k}">${esc(v.label)} (${esc(v.kind)})</option>`).join('');
+  const sel=el('symbol'); if(sel){ sel.innerHTML=options; sel.value='XAUUSD'; }
+  const ssel=el('stratSymbol'); if(ssel){ ssel.innerHTML=options; ssel.value='XAUUSD'; }
+  renderProviders();
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 init();

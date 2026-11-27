@@ -1,4 +1,4 @@
-const CACHE = 'market-ai-web-v3';
+const CACHE = 'market-ai-web-v4';
 // Relative to the service worker scope so it works on GitHub project Pages (/repo/).
 const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png', './data/market.json'];

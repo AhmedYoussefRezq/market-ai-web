@@ -9,7 +9,7 @@
 <title>Market AI — صفقة مدروسة بكل النماذج</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <header>
@@ -24,6 +24,31 @@
   <div class="row"><span class="k">مفاتيح محفوظة في المتصفح</span><span class="v" id="keyCount">0</span></div>
   <div class="row"><span class="k">نماذج جاهزة للتحليل</span><span class="v" id="modelCount">0</span></div>
   <button class="ghost" onclick="toggleSettings()">إعداد مفاتيح AI</button>
+</div>
+
+<div class="card" id="strategyCard">
+  <h2>الاستراتيجية المختبرة (قواعد ثابتة)</h2>
+  <p class="note">مش AI: قواعد RSI + EMA + ATR، متجرّبة على 5 سنين بيانات حقيقية. ده الأساس — والـ AI تحت رأي إضافي بس.</p>
+  <label>الأداة<select id="stratSymbol"></select></label>
+  <label>فريم الاستراتيجية<select id="stratTf">
+    <option value="D1" selected>D1 — يومي (الأفضل)</option>
+    <option value="H4">H4 — 4 ساعات</option>
+    <option value="H1">H1 — ساعة</option>
+  </select></label>
+  <button id="stratBtn" onclick="runStrategy()">شغّل الاستراتيجية</button>
+  <p class="note" id="stratMsg"></p>
+  <div id="stratStats" class="chips"></div>
+  <div id="stratSignal"></div>
+  <h3>منحنى النتائج (R)</h3>
+  <div id="equityChart"></div>
+  <h3>آخر الصفقات</h3>
+  <div id="stratTrades"></div>
+  <h3>حاسبة حجم الصفقة</h3>
+  <label>رأس المال ($)<input id="acctSize" type="number" inputmode="decimal" min="1" value="1000"></label>
+  <label>نسبة المخاطرة %<input id="riskPct" type="number" inputmode="decimal" min="0.1" step="0.1" value="1"></label>
+  <button class="ghost" onclick="calcRisk()">احسب حجم الصفقة</button>
+  <div id="riskOut" class="note"></div>
+  <p class="note">النتائج تاريخية ومش ضمان. جرّب على حساب تجريبي الأول. المواصفات تقديرية — راجع بروكرك.</p>
 </div>
 
 <div class="card" id="quickCard">
@@ -54,12 +79,13 @@
 </div>
 
 <div class="card">
-  <h2>تحليل السوق</h2>
+  <h2>رأي النماذج (اختياري)</h2>
+  <p class="note">ده رأي إضافي من الـ AI — مش أساس القرار. الأساس هو الاستراتيجية المختبرة فوق.</p>
   <label>الأداة<select id="symbol"></select></label>
   <label>الفريم<select id="interval">
     <option>M15</option><option>M30</option><option selected>H1</option><option>H4</option><option>D1</option>
   </select></label>
-  <button id="runBtn" onclick="analyze()">شغّل التحليل بكل المفاتيح</button>
+  <button id="runBtn" onclick="analyze()">اسأل النماذج (اختياري)</button>
   <button class="ghost" onclick="preview()">معاينة بيانات السوق</button>
   <p class="note">الأسعار والمؤشرات والأخبار بتتسحب من مصادر عامة، وبعدين كل موديل بيحلل على حدة، ويتعمل توافق بينهم.</p>
 </div>
@@ -96,6 +122,6 @@
   <p class="note" id="stamp"></p>
 </div>
 
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
