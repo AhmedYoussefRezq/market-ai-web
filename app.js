@@ -26,11 +26,11 @@ const INTERVALS = {
   H4:['60m','3mo',4], D1:['1d','1y',1]
 };
 const TEMPLATES = [
-  {name:'groq', base_url:'https://api.groq.com/openai/v1', model:'llama-3.3-70b-versatile', api_key:'', enabled:true},
-  {name:'openrouter', base_url:'https://openrouter.ai/api/v1', model:'meta-llama/llama-3.3-70b-instruct:free', api_key:'', enabled:true},
-  {name:'gemini', base_url:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-2.0-flash', api_key:'', enabled:true},
+  {name:'groq', base_url:'https://api.groq.com/openai/v1', model:'openai/gpt-oss-120b', api_key:'', enabled:true},
+  {name:'openrouter', base_url:'https://openrouter.ai/api/v1', model:'google/gemma-4-26b-a4b-it:free', api_key:'', enabled:true},
+  {name:'gemini', base_url:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-3.5-flash-lite', api_key:'', enabled:true},
   {name:'mistral', base_url:'https://api.mistral.ai/v1', model:'mistral-small-latest', api_key:'', enabled:true},
-  {name:'cerebras', base_url:'https://api.cerebras.ai/v1', model:'llama-3.3-70b', api_key:'', enabled:true},
+  {name:'cerebras', base_url:'https://api.cerebras.ai/v1', model:'gpt-oss-120b', api_key:'', enabled:true},
   {name:'openai', base_url:'https://api.openai.com/v1', model:'gpt-4o-mini', api_key:'', enabled:true},
   {name:'custom', base_url:'', model:'', api_key:'', enabled:true}
 ];
