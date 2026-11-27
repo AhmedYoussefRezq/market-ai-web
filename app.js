@@ -68,6 +68,30 @@ async function getText(url, ms=20000){
   finally{ clearTimeout(t); }
 }
 function viaProxy(url){ return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url); }
+// Several free CORS bridges — try them in order so a single outage doesn't break the site.
+const PROXIES = [
+  u => viaProxy(u),
+  u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+  u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u)
+];
+async function fetchViaProxies(url, kind='json', ms=18000){
+  const errors=[];
+  for(const make of PROXIES){
+    try{
+      const target=make(url);
+      let txt;
+      if(target.includes('allorigins.win/get')){
+        const d=await getJSON(target,ms);
+        txt=d.contents;
+        if(!txt) throw new Error('empty response');
+      }else{
+        txt=await getText(target,ms);
+      }
+      return kind==='json'?JSON.parse(txt):txt;
+    }catch(e){ errors.push(String(e.message||e).slice(0,80)); }
+  }
+  throw new Error('proxies failed: '+errors.join(' | '));
+}
 
 /* ---------- storage ---------- */
 function providers(){
@@ -132,7 +156,7 @@ async function fetchCandles(symbol, interval){
   let candles = [];
   try{
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(SYMBOLS[symbol].yahoo)}?range=${range}&interval=${yi}&includePrePost=false`;
-    const data = JSON.parse(await getText(viaProxy(url), 25000));
+    const data = await fetchViaProxies(url, 'json', 20000);
     const res = ((data.chart||{}).result||[])[0];
     if(res && res.timestamp){
       const q = ((res.indicators||{}).quote||[])[0] || {};
@@ -193,7 +217,7 @@ async function fetchNews(query, limit){
   }catch(e){
     try{
       const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-      const xml=await getText(viaProxy(rss),20000);
+      const xml=await fetchViaProxies(rss,'text',18000);
       const doc=new DOMParser().parseFromString(xml,'text/xml');
       items=[...doc.querySelectorAll('item')].slice(0,limit).map(x=>({title:(x.querySelector('title')?.textContent||'').slice(0,220),link:x.querySelector('link')?.textContent||'',published:x.querySelector('pubDate')?.textContent||'',source:x.querySelector('source')?.textContent||''}));
     }catch(e2){}
@@ -223,7 +247,7 @@ async function marketSnapshot(symbol, interval){
   const stBars=st&&st.indicators&&Number(st.indicators.bars)||0;
   const stAge=st&&isFinite(Date.parse(st.generated_at))?Date.now()-Date.parse(st.generated_at):Infinity;
   // Scheduled GitHub data is the reliable primary source — use it whenever it has real depth.
-  if(st && stBars>=30 && stAge < 3*60*60*1000) return st;
+  if(st && stBars>=30 && stAge < 20*60*1000) return st;
   const warnings=[];
   let cs=[]; try{ cs=await fetchCandles(symbol,interval); }catch(e){ warnings.push('price error'); }
   if(!cs.length) warnings.push('no price data');
