@@ -31,6 +31,8 @@ body.pro{max-width:none;margin:0;padding:0;height:100vh;overflow:hidden}
   border-radius:10px;padding:9px 11px;font-size:13px;font-weight:600;margin:5px 0;color:var(--txt)}
 #quickPrompts button:hover{border-color:var(--blue)}
 #ctxStamp{line-height:1.5}
+.pro-side details summary{cursor:pointer;color:var(--dim);font-size:13px;padding:8px 0}
+.pro-side details[open] summary{color:var(--txt)}
 #ctxStrat,#ctxBot{line-height:1.7}
 
 .pro-main{display:flex;flex-direction:column;min-height:0;min-width:0}

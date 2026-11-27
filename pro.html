@@ -57,20 +57,27 @@
     </div>
 
     <div class="card" id="proSettings" style="display:none">
-      <h2>مفاتيح AI</h2>
-      <p class="note">مفتاح OpenRouter مجاني واحد يفعّل 11 موديلاً. المفتاح بيتحفظ في <b>هذا المتصفح فقط</b>، ومش في أي ملف أو GitHub.</p>
-      <label>الصق المفتاح هنا<input id="quickKey" type="password" dir="ltr" autocomplete="off" placeholder="sk-or-..."></label>
-      <button onclick="proKeyAction('quick')">حفظ وتفعيل النماذج المجانية</button>
+      <h2>ربط AI من الموبايل</h2>
+      <p class="note">١. افتح <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> وسجّل مجاناً.<br>٢. اضغط <b>Create Key</b> وانسخه.<br>٣. الصقه هنا واضغط الزر — التطبيق هيشتغل على أي جهاز من غير الكمبيوتر.</p>
+      <label>مفتاح OpenRouter<input id="quickKey" type="password" dir="ltr" autocomplete="off" placeholder="sk-or-..."></label>
+      <button onclick="proQuickProvider('openrouter')">حفظ وتفعيل 11 موديل مجاني</button>
+      <p class="note tiny">أو مفتاح Groq من <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>:</p>
+      <label>مفتاح Groq<input id="groqKey" type="password" dir="ltr" autocomplete="off" placeholder="gsk_..."></label>
+      <button class="ghost" onclick="proQuickProvider('groq')">حفظ وتفعيل موديلات Groq</button>
+      <p class="note tiny">أو مفتاح Cerebras:</p>
+      <label>مفتاح Cerebras<input id="cerebrasKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"></label>
+      <button class="ghost" onclick="proQuickProvider('cerebras')">حفظ وتفعيل موديلات Cerebras</button>
       <p class="note" id="quickMsg"></p>
       <button class="ghost" onclick="proKeyAction('status')">حالة الحفظ</button>
       <div class="row"><span class="k">مفاتيح محفوظة</span><span class="v" id="keyCount">0</span></div>
       <div class="row"><span class="k">نماذج جاهزة</span><span class="v" id="modelCount">0</span></div>
       <div id="providerList"></div>
-      <button class="ghost" onclick="proKeyAction('templates')">قوالب مزودين إضافية</button>
-      <button class="ghost" onclick="proKeyAction('groq')">نماذج Groq المجانية</button>
-      <button class="ghost" onclick="proKeyAction('cerebras')">نماذج Cerebras المجانية</button>
-      <button class="ghost" onclick="proUseLocalBridge()">استخدم Groq من مفتاح الجهاز (جسر محلي)</button>
-      <p class="note tiny">الجسر بيقرأ `GROQ_API_KEY` من متغيرات البيئة على جهازك — المفتاح مش هيظهر في المتصفح ولا في أي ملف. شغّله من مجلد المشروع: <code>python scripts/local_ai_bridge.py</code>. ده بيشتغل طول ما الجهاز شغال؛ للاستخدام من الموبايل ادخل مفتاح OpenRouter مجاني بدل كده.</p>
+      <p class="note tiny">المفاتيح بتتخزن في متصفح هذا الهاتف فقط — مش في أي ملف أو GitHub. متشاركهاش مع حد.</p>
+      <details>
+        <summary>خيار متقدم: جسر الكمبيوتر</summary>
+        <button class="ghost" onclick="proUseLocalBridge()">استخدم Groq من مفتاح الجهاز</button>
+        <p class="note tiny">بيقرأ `GROQ_API_KEY` من متغيرات البيئة على الكمبيوتر، ومش بيظهر في المتصفح. بيشتغل على localhost فقط، يعني مش مناسب للموبايل.</p>
+      </details>
     </div>
   </aside>
 

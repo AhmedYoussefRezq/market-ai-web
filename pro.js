@@ -105,6 +105,23 @@ function proConnect(){
   const k=proEl('quickKey'); if(k) setTimeout(()=>k.focus(),250);
   err('الصق مفتاح OpenRouter مجاني واضغط الزر — المفاتيح بتتخزن في المتصفح بس.');
 }
+function proQuickProvider(source){
+  if(source==='openrouter'){ quickSetup(); proFillModels(); return; }
+  const ids={groq:'groqKey',cerebras:'cerebrasKey'}, set=FREE_MODEL_SETS[source];
+  if(!set) return;
+  const input=proEl(ids[source]), key=(input?.value||'').trim();
+  if(!key){ err('الصق المفتاح الأول من '+set.label); return; }
+  addTemplates();
+  const list=providers(), owner=list.find(p=>p.name.toLowerCase()===source);
+  if(!owner) list.push({name:source,base_url:set.base,model:set.models[0],api_key:key,enabled:true});
+  else owner.api_key=key;
+  if(!saveProviders(list)) return;
+  addFreeModels(source);
+  if(input) input.value='';
+  proFillModels(); renderProviders();
+  const n=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
+  err(`تم ✅ ${set.label} — ${n} موديل جاهز.`);
+}
 function proUseLocalBridge(){
   const list=providers(), base='http://localhost:8767/v1', model='openai/gpt-oss-120b';
   const found=list.find(p=>p.base_url===base&&p.model===model);
@@ -272,9 +289,10 @@ async function proSend(preset){
   err(''); proPush('user',text);
   const models=proActiveModels();
   if(!models.length){
-    const id=proPush('bot','لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح OpenRouter مجاني (تسجيل في دقيقة) — المفتاح بيتحفظ في متصفحك بس.');
+    const msg='لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح OpenRouter/Groq مجاني (تسجيل في دقيقة). المفتاح بيتحفظ في متصفح الهاتف بس، والتطبيق هيشتغل من غير أي كمبيوتر.';
+    const id=proPush('bot',msg);
     const body=proFind(id)?.querySelector('.body');
-    if(body) body.innerHTML=proMd('لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح OpenRouter مجاني (تسجيل في دقيقة) — المفتاح بيتحفظ في متصفحك بس.')+
+    if(body) body.innerHTML=proMd(msg)+
       '<div class="foot"><button onclick="proConnect()">اربط AI مجاني الآن</button></div>';
     proConnect();
     return;
