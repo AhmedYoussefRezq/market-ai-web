@@ -45,7 +45,7 @@ const FREE_MODEL_SETS = {
     'google/gemma-4-26b-a4b-it:free','google/gemma-4-31b-it:free'
   ]},
   groq:{label:'Groq', base:'https://api.groq.com/openai/v1', models:[
-    'openai/gpt-oss-120b','openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant'
+    'openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3.8-27b','allam-2-7b'
   ]},
   cerebras:{label:'Cerebras', base:'https://api.cerebras.ai/v1', models:[
     'gpt-oss-120b','qwen-3.8-27b'
@@ -133,9 +133,11 @@ function cacheSet(key,value){
 /* ---------- provider UI ---------- */
 function renderProviders(){
   const list = providers();
-  el('keyCount').textContent = new Set(list.filter(p=>p.api_key).map(p=>p.api_key)).size;
-  el('modelCount').textContent = list.filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
-  el('providerList').innerHTML = list.length ? list.map(p=>`
+  const kc=el('keyCount'), mc=el('modelCount'), pl=el('providerList');
+  if(kc) kc.textContent = new Set(list.filter(p=>p.api_key).map(p=>p.api_key)).size;
+  if(mc) mc.textContent = list.filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
+  if(!pl) return;
+  pl.innerHTML = list.length ? list.map(p=>`
     <div class="provider"><b>${esc(p.name)}</b> <span class="tiny">${esc(p.model)}</span>
       <div class="tiny">${p.api_key?'المفتاح محفوظ':'مفيش مفتاح'} · ${p.enabled?'مفعّل':'متوقف'}</div>
       <div class="row"><button class="mini" onclick="toggleProvider('${esc(p.name)}')">${p.enabled?'إيقاف':'تفعيل'}</button>

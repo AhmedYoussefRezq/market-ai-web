@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Market AI Pro — مساعد التحليل</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="pro.css?v=1">
+</head>
+<body class="pro">
+
+<header class="pro-head">
+  <div class="logo">M</div>
+  <div class="pro-title">
+    <h1>Market AI Pro</h1>
+    <p class="sub">مساعد تحليل مبني على بيانات فعلية · بدون كمبيوتر شغال · تحليل بس</p>
+  </div>
+  <nav class="pro-nav">
+    <a href="index.html">النسخة الكلاسيكية</a>
+    <button class="ghost" onclick="toggleProSettings()">ربط AI / المفاتيح</button>
+  </nav>
+</header>
+
+<div class="pro-bar">
+  <label>الأداة<select id="proSymbol"></select></label>
+  <label>الفريم<select id="proInterval">
+    <option value="M15">M15</option><option value="M30">M30</option>
+    <option value="H1" selected>H1</option><option value="H4">H4</option><option value="D1">D1</option>
+  </select></label>
+  <label>الموديل<select id="proModel"></select></label>
+  <label class="check"><input type="checkbox" id="proConsensus"> توافق عدة موديلات</label>
+  <button class="ghost" id="ctxBtn" onclick="refreshContext()">تحديث البيانات</button>
+</div>
+
+<div class="pro-layout">
+  <aside class="pro-side">
+    <div class="card" id="contextCard">
+      <h2>سياق التحليل</h2>
+      <p class="tiny" id="ctxStamp">لسه مفيش بيانات — اكتب سؤال أو اضغط «تحديث البيانات».</p>
+      <div id="ctxInd" class="chips"></div>
+      <h3>الاستراتيجية المختبرة</h3>
+      <div id="ctxStrat" class="tiny"></div>
+      <h3>مرجع بوت الديمو</h3>
+      <div id="ctxBot" class="tiny"></div>
+      <p class="note" id="ctxWarnings"></p>
+    </div>
+
+    <div class="card">
+      <h2>أسئلة جاهزة</h2>
+      <div id="quickPrompts"></div>
+      <p class="note tiny">الأسئلة بتروح للموديل ومعاها بيانات السوق والباكتيست الحالية — مش إجابات محفوظة.</p>
+    </div>
+
+    <div class="card" id="proSettings" style="display:none">
+      <h2>مفاتيح AI</h2>
+      <p class="note">مفتاح OpenRouter مجاني واحد يفعّل 11 موديلاً. المفتاح بيتحفظ في <b>هذا المتصفح فقط</b>، ومش في أي ملف أو GitHub.</p>
+      <label>الصق المفتاح هنا<input id="quickKey" type="password" dir="ltr" autocomplete="off" placeholder="sk-or-..."></label>
+      <button onclick="proKeyAction('quick')">حفظ وتفعيل النماذج المجانية</button>
+      <p class="note" id="quickMsg"></p>
+      <button class="ghost" onclick="proKeyAction('status')">حالة الحفظ</button>
+      <div class="row"><span class="k">مفاتيح محفوظة</span><span class="v" id="keyCount">0</span></div>
+      <div class="row"><span class="k">نماذج جاهزة</span><span class="v" id="modelCount">0</span></div>
+      <div id="providerList"></div>
+      <button class="ghost" onclick="proKeyAction('templates')">قوالب مزودين إضافية</button>
+      <button class="ghost" onclick="proKeyAction('groq')">نماذج Groq المجانية</button>
+      <button class="ghost" onclick="proKeyAction('cerebras')">نماذج Cerebras المجانية</button>
+      <button class="ghost" onclick="proUseLocalBridge()">استخدم Groq من مفتاح الجهاز (جسر محلي)</button>
+      <p class="note tiny">الجسر بيقرأ `GROQ_API_KEY` من متغيرات البيئة على جهازك — المفتاح مش هيظهر في المتصفح ولا في أي ملف. شغّله من مجلد المشروع: <code>python scripts/local_ai_bridge.py</code>. ده بيشتغل طول ما الجهاز شغال؛ للاستخدام من الموبايل ادخل مفتاح OpenRouter مجاني بدل كده.</p>
+    </div>
+  </aside>
+
+  <main class="pro-main">
+    <div id="err" class="err pro-err" role="status"></div>
+    <div id="chat" class="chat"></div>
+    <div class="composer">
+      <textarea id="proInput" rows="2" dir="rtl" placeholder="اسأل عن السوق، إشارة، مخاطرة، أو اطلب شرح استراتيجية..."></textarea>
+      <div class="composer-actions">
+        <button id="sendBtn" onclick="proSend()">إرسال</button>
+        <button class="ghost" onclick="clearChat()">مسح المحادثة</button>
+        <button class="ghost" onclick="exportChat()">تصدير</button>
+        <span class="tiny" id="chatMeta"></span>
+      </div>
+    </div>
+    <p class="note tiny">
+      هذا التطبيق <b>تحليل فقط</b>: ما بيبعتش أي أمر، وما بيديرش فلوس. الأسعار من مصادر عامة وقد تكون متأخرة.
+      الردود محتاجة <b>مفتاح AI مجاني</b> من <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> — بيتحفظ في متصفحك بس.
+      الـ AI ممكن يغلط — راجع الأرقام بنفسك، ومفيش أي ضمان ربح.
+    </p>
+  </main>
+</div>
+
+<script src="app.js?v=9"></script>
+<script src="pro.js?v=1"></script>
+</body>
+</html>

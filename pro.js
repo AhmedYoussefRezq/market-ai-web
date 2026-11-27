@@ -1,0 +1,333 @@
+/* Market AI Pro — chat-first trading analyst.
+   Static app: free public data + keys kept in this browser. ANALYSIS ONLY. */
+
+const PRO_CHAT_KEY = 'market-ai-pro-chat-v1';
+const PRO_PREF_KEY = 'market-ai-pro-prefs-v1';
+const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد أبحاث تداول محترف. قواعدك الصارمة:
+1) استخدم فقط البيانات المرفقة في السياق (JSON). لا تخترع أسعاراً أو أخباراً أو أرقاماً أو تواريخ. لو معلومة غير موجودة قل «غير متوفرة في البيانات المرفقة».
+2) أجب بالعربية المصرية، باختصار ووضوح، بعناوين ونقاط قصيرة. لا وعود ربح، ولا توصية نهائية بالشراء أو البيع.
+3) فرّق صراحة بين: (أ) بيانات السوق الفعلية، (ب) قواعد استراتيجية مختبرة، (ج) رأي AI. اذكر أي واحد استخدمته في كل نقطة.
+4) دائماً اذكر المخاطرة، وأن البيانات التاريخية ليست ضماناً، وأن هذا التطبيق تحليل فقط لا يرسل أوامر ولا يدير أموالاً.
+5) لو طلب المستخدم تنفيذ صفقة أو نصيحة مالية شخصية، اعتذر بلطف وقل: التطبيق للتحليل فقط، وجرّب أي فكرة على حساب ديمو بنفسك.
+6) لا تقل «متأكد» أو «مضمون». استخدم صيغ تحفظ مثل: «البيانات المتاحة تشير إلى...».
+7) إذا كانت بيانات السوق قديمة أو بها تحذيرات، اذكر ذلك في بداية الرد.`;
+
+const PRO_PROMPTS = [
+  'حلّل الأداة الحالية دلوقتي: الاتجاه، الزخم، وأهم مستويات الدعم والمقاومة.',
+  'إيه رأيك في إشارة الاستراتيجية المختبرة؟ وليه البوت ما بيدخلش في نص الحركة؟',
+  'احسب لي حجم اللوت لو رأس المال 1000$ ونسبة المخاطرة 1%.',
+  'لخّص الأخبار المرفقة وتأثيرها المحتمل على الأداة.',
+  'اشرح الفرق بين الزخم اللحظي والارتداد على M15، وليه M15 أفضل هنا.',
+  'قارن بين الذهب والبيتكوين من ناحية السبريد والتذبذب.'
+];
+
+var PRO_CTX = null;
+var PRO_CTX_AT = 0;
+var PRO_BUSY = false;
+
+function proEl(id){ return document.getElementById(id); }
+function proPrefs(){
+  try{ return JSON.parse(localStorage.getItem(PRO_PREF_KEY)||'{}'); }catch(e){ return {}; }
+}
+function proSavePrefs(p){ try{ localStorage.setItem(PRO_PREF_KEY,JSON.stringify(p)); }catch(e){} }
+function proChat(){
+  try{ const a=JSON.parse(localStorage.getItem(PRO_CHAT_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; }
+}
+function proSaveChat(a){
+  try{ localStorage.setItem(PRO_CHAT_KEY,JSON.stringify(a.slice(-60))); }catch(e){}
+}
+function proTime(){ return new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}); }
+function proMd(t){
+  let s=esc(t||'');
+  s=s.replace(/```([\s\S]*?)```/g,(_,c)=>'<pre><code>'+c.trim()+'</code></pre>');
+  s=s.replace(/`([^`\n]+)`/g,'<code>$1</code>');
+  s=s.replace(/^#{1,3}\s+(.+)$/gm,'<h4>$1</h4>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>');
+  s=s.replace(/^\s*[-*•]\s+(.+)$/gm,'<li>$1</li>');
+  s=s.replace(/^\s*(\d+)\.\s+(.+)$/gm,'<b>$1.</b> $2');
+  return s.replace(/\n/g,'<br>');
+}
+function proPush(role,text,meta){
+  const m={id:String(Date.now())+Math.random().toString(36).slice(2,7),role,text,meta:meta||{},at:proTime()};
+  const all=proChat(); all.push(m); proSaveChat(all); proRenderChat(); return m.id;
+}
+function proFind(id){ return proEl('chat')?.querySelector('[data-id="'+id+'"]'); }
+function proUpdate(id,text,meta){
+  const node=proFind(id); if(!node) return;
+  const body=node.querySelector('.body'); if(body) body.innerHTML=proMd(text);
+  const who=node.querySelector('.who'); if(who&&meta){
+    who.innerHTML='<b>'+esc(meta.model||'AI')+'</b>'+(meta.ms?'<span>· '+meta.ms+'ms</span>':'')+'<span>· '+esc(meta.at||'')+'</span>';
+  }
+  const all=proChat(); const m=all.find(x=>x.id===id);
+  if(m){ m.text=text; if(meta) m.meta=meta; proSaveChat(all); }
+}
+function proRenderChat(){
+  const box=proEl('chat'); if(!box) return;
+  const all=proChat();
+  if(!all.length){
+    box.innerHTML='<div class="msg bot"><div class="who"><b>Market AI Pro</b></div><div class="body">'+
+      'أهلاً! اسألني عن السوق أو اطلب تحليل أداة معينة. أنا بشوف بيانات السوق والباكتيست المرفقة قبل ما أجاوب — '+
+      'ومش باخترع أرقام. التطبيق ده <b>تحليل بس</b> ومش بيفتح أوامر.'+
+      '<div class="foot"><button onclick="proConnect()">اربط AI مجاني</button></div></div>';
+  }else{
+    box.innerHTML=all.map(m=>{
+      const meta=m.meta||{};
+      return '<div class="msg '+m.role+'" data-id="'+esc(m.id)+'">'+
+        (m.role==='bot'?'<div class="who"><b>'+esc(meta.model||'AI')+'</b>'+(meta.ms?'<span>· '+meta.ms+'ms</span>':'')+'<span>· '+esc(m.at||'')+'</span></div>':'<div class="who">أنت · '+esc(m.at||'')+'</div>')+
+        '<div class="body">'+proMd(m.text)+'</div>'+
+        (m.role==='bot'?'<div class="foot"><button class="ghost" onclick="proCopy(\''+esc(m.id)+'\')">نسخ</button></div>':'')+
+        '</div>';
+    }).join('');
+  }
+  const meta=proEl('chatMeta'); if(meta) meta.textContent=all.length+' رسالة محفوظة في هذا المتصفح';
+  box.scrollTop=box.scrollHeight;
+}
+function proCopy(id){
+  const m=proChat().find(x=>x.id===id); if(!m) return;
+  navigator.clipboard?.writeText(m.text).then(()=>err('اتنسخ الرد.')).catch(()=>err('مش قادر أنسخ — اختار النص واعمل نسخ يدوي.'));
+}
+function clearChat(){
+  if(!confirm('مسح كل المحادثة المحفوظة؟')) return;
+  proSaveChat([]); proRenderChat(); err('');
+}
+function exportChat(){
+  const all=proChat(); if(!all.length){ err('مفيش محادثة لتصديرها.'); return; }
+  const txt=all.map(m=>`[${m.at}] ${m.role==='user'?'أنت':(m.meta.model||'AI')}\n${m.text}\n`).join('\n---\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));
+  a.download='market-ai-pro-chat.txt'; a.click(); URL.revokeObjectURL(a.href);
+}
+function toggleProSettings(){
+  const s=proEl('proSettings'); if(s) s.style.display=s.style.display==='none'?'block':'none';
+}
+function proConnect(){
+  const s=proEl('proSettings'); if(s){ s.style.display='block'; s.scrollIntoView({behavior:'smooth',block:'center'}); }
+  const k=proEl('quickKey'); if(k) setTimeout(()=>k.focus(),250);
+  err('الصق مفتاح OpenRouter مجاني واضغط الزر — المفاتيح بتتخزن في المتصفح بس.');
+}
+function proUseLocalBridge(){
+  const list=providers(), base='http://localhost:8767/v1', model='openai/gpt-oss-120b';
+  const found=list.find(p=>p.base_url===base&&p.model===model);
+  if(found) found.enabled=true;
+  else list.push({name:'groq-local',base_url:base,model,api_key:'local',enabled:true});
+  saveProviders(list); renderProviders(); proFillModels();
+  err('اتضاف موديل Groq المحلي. لو الجسر شغال (`python scripts/local_ai_bridge.py`) اسأل دلوقتي — المفتاح مش موجود في المتصفح.');
+}
+function proKeyAction(action){
+  if(action==='quick') quickSetup();
+  else if(action==='templates') addTemplates();
+  else if(action==='groq') addFreeModels('groq');
+  else if(action==='cerebras') addFreeModels('cerebras');
+  else if(action==='status') showSaveStatus();
+  proFillModels();
+}
+function proFillModels(){
+  const sel=proEl('proModel'); if(!sel) return;
+  const list=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model);
+  sel.innerHTML=list.length?list.map((p,i)=>`<option value="${i}">${esc(p.name)} — ${esc(p.model)}</option>`).join('')
+    :'<option value="">مفيش موديلات — افتح «مفاتيح AI»</option>';
+  const prefs=proPrefs();
+  if(prefs.model!==undefined && +prefs.model<list.length) sel.value=String(prefs.model);
+}
+function proActiveModels(){
+  const all=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model);
+  const sel=proEl('proModel');
+  if(proEl('proConsensus')?.checked) return all.slice(0,4);
+  const i=sel?Number(sel.value||0):0;
+  return all[i]?[all[i]]:(all[0]?[all[0]]:[]);
+}
+
+/* ---------- grounded context ---------- */
+function withTimeout(p,ms,fallback){
+  return Promise.race([p,new Promise(r=>setTimeout(()=>r(fallback),ms))]);
+}
+async function quickPrice(symbol){
+  if(symbol==='XAUUSD'||symbol==='XAGUSD'){
+    try{
+      const d=await getJSON('https://api.gold-api.com/price/'+(symbol==='XAUUSD'?'XAU':'XAG'),3500);
+      const p=Number(d.price); return isFinite(p)?p:null;
+    }catch(e){ return null; }
+  }
+  if(symbol==='BTCUSD'||symbol==='ETHUSD'){
+    try{
+      const pair=symbol==='BTCUSD'?'BTCUSDT':'ETHUSDT';
+      const d=await getJSON('https://api.binance.com/api/v3/ticker/price?symbol='+pair,3500);
+      const p=Number(d.price); return isFinite(p)?p:null;
+    }catch(e){ return null; }
+  }
+  return null;
+}
+async function buildProContext(){
+  const symbol=proEl('proSymbol')?.value||'XAUUSD';
+  const interval=proEl('proInterval')?.value||'H1';
+  const ctx={generated_at:new Date().toISOString().slice(0,19),instrument:symbol,timeframe:interval,mode:'ANALYSIS ONLY'};
+  let livePrice=null;
+  try{ livePrice=await withTimeout(quickPrice(symbol),4000,null); }catch(e){}
+  let snap=null;
+  try{ snap=await withTimeout(staticSnapshot(symbol,interval),4000,null); }catch(e){}
+  if(!snap||!((snap.indicators||{}).last)){
+    try{ snap=await withTimeout(marketSnapshot(symbol,interval),9000,null); }catch(e){}
+  }
+  if(snap&&((snap.indicators||{}).last||livePrice!==null)){
+    const i=snap.indicators||{}, warnings=[...(snap.warnings||[])];
+    const age=snap.generated_at&&isFinite(Date.parse(snap.generated_at))?Date.now()-Date.parse(snap.generated_at):Infinity;
+    if(age>6*3600*1000) warnings.push('النسخة المحفوظة على GitHub قديمة — الأرقام تقريبية');
+    if(livePrice!==null) warnings.push('سعر لحظي من مصدر عام: '+livePrice);
+    ctx.market={label:snap.label||SYMBOLS[symbol]?.label,source_snapshot:snap.generated_at,
+      price:livePrice!==null?livePrice:i.last,last:livePrice!==null?livePrice:i.last,
+      snapshot_price:i.last,change_pct:i.change_pct,
+      ema20:i.ema20,ema50:i.ema50,sma200:i.sma200,rsi14:i.rsi14,atr14:i.atr14,atr_pct:i.atr_pct,
+      trend:i.trend,high20:i.high20,low20:i.low20,bars:i.bars,
+      recent_candles:(snap.recent_candles||[]).slice(-8),
+      macro:(snap.macro||[]).map(x=>({symbol:x.symbol,price:x.price,change_pct:x.change_pct,trend:x.trend})),
+      news:(snap.news||[]).slice(0,7).map(x=>x.title),warnings};
+  }else{
+    ctx.market={price:livePrice,error:'مفيش بيانات سوق متاحة دلوقتي — الموديل هيجاوب بدون أرقام سوق.'};
+  }
+
+  const stratTf=['D1','H4','H1'].includes(interval)?interval:'D1';
+  try{
+    const h=await loadHistory(symbol,stratTf);
+    const st=stratStats(backtest(h.candles));
+    const sig=stratSignal(h.candles);
+    ctx.rule_strategy={symbol,timeframe:stratTf,bars:h.candles.length,source:h.source,
+      result:{trades:st.trades,win_rate:st.win_rate,profit_factor:st.profit_factor,
+        total_r:st.total_r,max_dd:st.max_dd,avg_r:st.avg_r},
+      current_signal:sig?{bias:sig.bias,rsi:sig.rsi,trend:sig.trend,entry:sig.entry,sl:sig.sl,tp:sig.tp}:null,
+      note:'قواعد RSI50 + EMA20/50 + ATR — هامش رفيع، مش ضمان'};
+  }catch(e){ ctx.rule_strategy={error:String(e.message||e)}; }
+
+  ctx.demo_bot_reference={
+    symbol:'XAUUSDm',timeframe:'M15',mode:'EMA20/50 + RSI45/55 + EMA9 pullback',
+    broker_backtest:{trades:130,win_rate:43.8,profit_factor:1.19,total_r:12.9,max_dd:6.0},
+    note:'من بيانات MT5 بعد خصم السبريد — بوت ديمو فقط، لسه مفيش نتائج حية كافية'
+  };
+  return ctx;
+}
+async function refreshContext(){
+  const btn=proEl('ctxBtn'), stamp=proEl('ctxStamp');
+  if(btn) btn.disabled=true;
+  if(stamp) stamp.textContent='جاري سحب بيانات السوق والباكتيست...';
+  try{
+    PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now();
+    const m=PRO_CTX.market||{};
+    if(stamp) stamp.textContent=(PRO_CTX.instrument||'')+' / '+(PRO_CTX.timeframe||'')+' · '+
+      (m.source_snapshot||PRO_CTX.generated_at)+(m.error?' · '+m.error:'');
+    const ind=proEl('ctxInd');
+    if(ind) ind.innerHTML=renderIndicators(m).replace(/undefined/g,'-');
+    const rs=PRO_CTX.rule_strategy||{};
+    const s=proEl('ctxStrat');
+    if(s) s.innerHTML=rs.error?esc(rs.error):
+      `${esc(rs.symbol)} · ${esc(rs.timeframe)} · ${rs.bars} شمعة · ${rs.result.trades} صفقة · PF <b>${esc(rs.result.profit_factor)}</b> · DD ${esc(rs.result.max_dd)}R<br>الإشارة: <b>${esc(rs.current_signal?.bias||'WAIT')}</b>`;
+    const b=proEl('ctxBot');
+    if(b) b.innerHTML='XAUUSDm / M15 · 130 صفقة · PF <b>1.19</b> · DD 6R<br><span class="tiny">باكتيست بروكري، ديمو فقط — مش نتائج حية</span>';
+    const w=proEl('ctxWarnings');
+    if(w) w.textContent=(m.warnings||[]).length?'تحذيرات البيانات: '+m.warnings.join(' · '):'';
+  }catch(e){ if(stamp) stamp.textContent='خطأ في تحديث السياق: '+e.message; }
+  finally{ if(btn) btn.disabled=false; }
+}
+
+/* ---------- chat engine ---------- */
+async function proCallChat(p,messages,onChunk){
+  const started=Date.now(), url=p.base_url.replace(/\/$/,'')+'/chat/completions';
+  const headers={'Authorization':'Bearer '+p.api_key,'Content-Type':'application/json'};
+  const base={model:p.model,messages,temperature:0.35,max_tokens:1400};
+  try{
+    const r=await fetch(url,{method:'POST',headers,body:JSON.stringify({...base,stream:true})});
+    if(!r.ok||!r.body) throw new Error('HTTP '+r.status);
+    const reader=r.body.getReader(), dec=new TextDecoder();
+    let buf='', full='';
+    for(;;){
+      const {done,value}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      let i;
+      while((i=buf.indexOf('\n\n'))>=0){
+        const raw=buf.slice(0,i); buf=buf.slice(i+2);
+        for(const line of raw.split('\n')){
+          if(!line.startsWith('data:')) continue;
+          const data=line.slice(5).trim(); if(!data||data==='[DONE]') continue;
+          try{ const j=JSON.parse(data), t=j.choices?.[0]?.delta?.content; if(t){ full+=t; if(onChunk) onChunk(full); } }catch(e){}
+        }
+      }
+    }
+    if(!full.trim()) throw new Error('empty stream');
+    return {ok:true,text:full,error:null,ms:Date.now()-started,name:p.name,model:p.model};
+  }catch(e){
+    try{
+      const r=await fetch(url,{method:'POST',headers,body:JSON.stringify({...base,stream:false})});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d=await r.json(), text=(d.choices||[])[0]?.message?.content||'';
+      if(!text) throw new Error('empty response');
+      if(onChunk) onChunk(text);
+      return {ok:true,text,error:null,ms:Date.now()-started,name:p.name,model:p.model};
+    }catch(e2){ return {ok:false,text:'',error:redact(e2.message,p.api_key),ms:Date.now()-started,name:p.name,model:p.model}; }
+  }
+}
+async function proSend(preset){
+  if(PRO_BUSY) return;
+  const input=proEl('proInput');
+  const text=(preset||input?.value||'').trim();
+  if(!text) return;
+  if(input) input.value='';
+  err(''); proPush('user',text);
+  const models=proActiveModels();
+  if(!models.length){
+    const id=proPush('bot','لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح OpenRouter مجاني (تسجيل في دقيقة) — المفتاح بيتحفظ في متصفحك بس.');
+    const body=proFind(id)?.querySelector('.body');
+    if(body) body.innerHTML=proMd('لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح OpenRouter مجاني (تسجيل في دقيقة) — المفتاح بيتحفظ في متصفحك بس.')+
+      '<div class="foot"><button onclick="proConnect()">اربط AI مجاني الآن</button></div>';
+    proConnect();
+    return;
+  }
+  if(!PRO_CTX||Date.now()-PRO_CTX_AT>10*60*1000){
+    const stamp=proEl('ctxStamp'); if(stamp) stamp.textContent='بحدّث بيانات السوق قبل الرد...';
+    try{ PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now(); refreshContext(); }catch(e){}
+  }
+  const hist=proChat().slice(-8,-1).map(m=>({role:m.role==='user'?'user':'assistant',content:String(m.text||'').slice(0,1200)}));
+  const messages=[{role:'system',content:PRO_SYSTEM},...hist,
+    {role:'user',content:JSON.stringify({question:text,context:PRO_CTX})}];
+
+  PRO_BUSY=true;
+  const btn=proEl('sendBtn'); if(btn){ btn.disabled=true; btn.textContent='جاري الرد...'; }
+  const ids=models.map(p=>{
+    const id=proPush('bot','جاري التحليل...',{model:p.name,at:proTime()});
+    const body=proFind(id)?.querySelector('.body');
+    if(body) body.innerHTML='<span class="typing"><i></i><i></i><i></i></span> جاري التحليل...';
+    return id;
+  });
+  try{
+    await Promise.all(models.map((p,k)=>proCallChat(p,messages,partial=>{
+      proUpdate(ids[k],partial,{model:p.name,at:proTime()});
+    }).then(r=>{
+      const final=r.ok?r.text:'تعذّر الحصول على رد من '+p.name+' — '+r.error;
+      proUpdate(ids[k],final,{model:p.name,ms:r.ms,at:proTime()});
+    })));
+  }catch(e){ err('خطأ: '+e.message); }
+  finally{
+    PRO_BUSY=false;
+    if(btn){ btn.disabled=false; btn.textContent='إرسال'; }
+  }
+}
+
+function proInit(){
+  const sel=proEl('proSymbol');
+  if(sel){
+    sel.innerHTML=Object.entries(SYMBOLS).map(([k,v])=>`<option value="${k}">${esc(v.label)}</option>`).join('');
+    sel.value=(proPrefs().symbol)||'XAUUSD';
+  }
+  const iv=proEl('proInterval'); if(iv) iv.value=(proPrefs().interval)||'H1';
+  const cons=proEl('proConsensus'); if(cons) cons.checked=!!proPrefs().consensus;
+  proFillModels();
+  const q=proEl('quickPrompts');
+  if(q) q.innerHTML=PRO_PROMPTS.map(x=>'<button onclick="proSend(this.textContent)">'+esc(x)+'</button>').join('');
+  proRenderChat();
+  const input=proEl('proInput');
+  if(input) input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); proSend(); } });
+  [proEl('proSymbol'),proEl('proInterval'),proEl('proModel'),proEl('proConsensus')].forEach(n=>{
+    if(n) n.addEventListener('change',()=>proSavePrefs({
+      symbol:proEl('proSymbol')?.value,interval:proEl('proInterval')?.value,
+      model:proEl('proModel')?.value,consensus:!!proEl('proConsensus')?.checked}));
+  });
+  refreshContext();
+}
+proInit();

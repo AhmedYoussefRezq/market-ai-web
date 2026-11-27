@@ -1,7 +1,8 @@
-const CACHE = 'market-ai-web-v4';
+const CACHE = 'market-ai-web-v5';
 // Relative to the service worker scope so it works on GitHub project Pages (/repo/).
-const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest',
-  './icon-192.png', './icon-512.png', './apple-touch-icon.png', './data/market.json'];
+const ASSETS = ['./', './index.html', './pro.html', './style.css', './pro.css', './app.js',
+  './pro.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
+  './apple-touch-icon.png', './data/market.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

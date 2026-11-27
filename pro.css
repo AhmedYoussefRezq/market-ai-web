@@ -1,0 +1,81 @@
+/* Market AI Pro — chat-first analyst layout (RTL). */
+body.pro{max-width:none;margin:0;padding:0;height:100vh;overflow:hidden}
+.pro-head{position:sticky;top:0;z-index:30;display:flex;gap:12px;align-items:center;padding:10px 18px;
+  background:#0e141b;border-bottom:1px solid var(--line)}
+.pro-head .logo{flex:0 0 42px;width:42px;height:42px;border-radius:12px;font-size:22px}
+.pro-title h1{font-size:19px}
+.pro-nav{margin-inline-start:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pro-nav a{font-size:13px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;white-space:nowrap}
+.pro-nav button{width:auto;margin:0;padding:8px 12px;font-size:13px}
+
+.pro-bar{position:sticky;top:63px;z-index:20;display:flex;gap:10px;align-items:end;flex-wrap:wrap;
+  padding:9px 18px;background:#111822;border-bottom:1px solid var(--line)}
+.pro-bar label{margin:0;font-size:12px;min-width:118px;flex:0 1 auto}
+.pro-bar select{margin-top:3px;padding:8px 10px;font-size:14px;min-width:110px}
+.pro-bar .check{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:auto}
+.pro-bar .check input{width:auto;margin:0 0 0 4px;accent-color:var(--blue)}
+.pro-bar button{width:auto;margin:0 0 0 auto;padding:8px 14px;font-size:13px}
+
+.pro-layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:14px;padding:14px 18px;
+  height:calc(100vh - 116px)}
+.pro-side{overflow-y:auto;padding-inline-end:4px}
+.pro-side .card{padding:13px;margin-bottom:10px}
+.pro-side h2{margin:0 0 8px;font-size:15px}
+.pro-side h3{margin:12px 0 5px;font-size:12px}
+.pro-side .row{padding:5px 0;font-size:13px}
+.pro-side label{font-size:12px;margin:8px 0}
+.pro-side input,.pro-side select{padding:9px;font-size:14px}
+.pro-side button{margin-top:6px;padding:9px;font-size:13px}
+.pro-side button.ghost{padding:8px}
+#quickPrompts button{width:100%;text-align:right;background:#0e141b;border:1px solid var(--line);
+  border-radius:10px;padding:9px 11px;font-size:13px;font-weight:600;margin:5px 0;color:var(--txt)}
+#quickPrompts button:hover{border-color:var(--blue)}
+#ctxStamp{line-height:1.5}
+#ctxStrat,#ctxBot{line-height:1.7}
+
+.pro-main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.pro-err{min-height:18px;margin:0 0 6px}
+.chat{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;
+  padding:8px 6px 18px;scroll-behavior:smooth}
+.msg{max-width:82%;padding:11px 14px;border-radius:16px;border:1px solid var(--line);
+  background:var(--card);line-height:1.75;font-size:14.5px;word-break:break-word}
+.msg.user{margin-right:auto;background:#16253a;border-color:#274367}
+.msg.bot{margin-left:auto}
+.msg .who{font-size:11px;color:var(--dim);margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.msg .who b{color:var(--blue)}
+.msg .body h3,.msg .body h4{font-size:14px;color:var(--gold);margin:9px 0 4px}
+.msg .body ul{margin:5px 0;padding-inline-start:20px;font-size:14px}
+.msg .body li{margin:2px 0}
+.msg .body code{background:#0c1218;border:1px solid var(--line);border-radius:6px;padding:1px 5px;font-size:13px}
+.msg .body pre{background:#0c1218;border:1px solid var(--line);border-radius:10px;padding:9px;overflow-x:auto}
+.msg .body pre code{border:0}
+.msg .body a{text-decoration:underline}
+.msg .foot{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.msg .foot button{width:auto;margin:0;padding:4px 9px;font-size:11px}
+.typing{display:inline-flex;gap:4px;align-items:center}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--dim);animation:pulse 1s infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+.composer{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;margin-top:6px}
+.composer textarea{width:100%;min-height:62px;max-height:180px;resize:vertical;padding:10px 12px;
+  border-radius:10px;border:1px solid var(--line);background:#0e141b;color:var(--txt);font-family:inherit;font-size:14px}
+.composer-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px}
+.composer-actions button{width:auto;margin:0;padding:9px 16px;font-size:13px}
+.composer-actions #sendBtn{background:var(--blue);color:#06101f;font-weight:800}
+.composer-actions .tiny{margin-inline-start:auto}
+.pro-main>.note{margin:6px 2px 0}
+
+@media (max-width:900px){
+  body.pro{height:auto;overflow:auto}
+  .pro-head{flex-wrap:wrap;padding:9px 12px}
+  .pro-bar{top:0;position:relative;padding:9px 12px}
+  .pro-bar .check{margin-inline-start:0}
+  .pro-bar button{margin-inline-start:0}
+  .pro-layout{display:flex;flex-direction:column;height:auto;padding:10px 12px;gap:10px}
+  .pro-main{order:1}
+  .pro-side{order:2;overflow:visible}
+  .chat{height:58vh;padding:6px 2px 10px}
+  .msg{max-width:92%}
+  .composer-actions .tiny{width:100%;margin-inline-start:0}
+}
