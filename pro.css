@@ -83,6 +83,17 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .chip{background:#0b0e11;border:1px solid var(--line);border-radius:4px;padding:3px 8px;font-size:10.5px;color:var(--muted)}
 .chip b{color:var(--txt)}
+.chip .age{display:inline-block;margin-inline-start:5px;font-style:normal;font-size:9px;
+  color:var(--muted);opacity:.85}
+.macro-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
+.macro-cell{display:flex;align-items:baseline;gap:5px;background:#0b0e11;border:1px solid var(--line);
+  border-radius:5px;padding:4px 7px;font-size:10.5px}
+.macro-cell .m-label{color:var(--muted);font-weight:700}
+.macro-cell b{color:var(--txt)}
+.macro-cell .m-chg{font-size:9.5px}
+.macro-cell .m-chg.pos{color:var(--green)}
+.macro-cell .m-chg.neg{color:var(--red)}
+.macro-cell .age{margin-inline-start:auto;font-style:normal;font-size:9px;color:var(--muted)}
 .news-list{display:flex;flex-direction:column;gap:4px;margin-top:9px}
 .news-list>p{margin:0 0 2px}
 .news-item{display:flex;gap:8px;justify-content:space-between;align-items:flex-start;text-decoration:none;

@@ -598,7 +598,9 @@ async function marketSnapshot(symbol, interval){
   const seen=new Set(), merged=[];
   for(const n of news){ if(n.title && !seen.has(n.title)){ seen.add(n.title); merged.push(n); } if(merged.length>=12) break; }
   // Refreshing macro through free proxies is slow — reuse the committed snapshot when present.
-  const macro=(st&&st.macro&&st.macro.length>=2)?st.macro:await fetchMacro();
+  let macro=[];
+  try{ macro=await liveMacro(); }catch(e){}
+  if(macro.length<2) macro=(st&&st.macro&&st.macro.length>=2)?st.macro:await fetchMacro();
   const snap={symbol,label:SYMBOLS[symbol].label,interval,generated_at:new Date().toISOString().slice(0,19),
     indicators:indicators(cs),recent_candles:cs.slice(-16).map(c=>({t:new Date(c.t*1000).toISOString().slice(0,16).replace('T',' '),o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
     macro, news:merged, warnings};
@@ -634,10 +636,44 @@ async function fetchGoldSpot(){
   }catch(e){ return null; }
 }
 
+/* Live macro board (DXY, US10Y, VIX, S&P 500) — TradingView public scanner, CORS-open. */
+const MACRO_LIVE = [
+  {tid:'TVC:DXY', symbol:'DXY', label:'مؤشر الدولار'},
+  {tid:'TVC:US10Y', symbol:'US10Y', label:'عائد 10 سنين'},
+  {tid:'TVC:VIX', symbol:'VIX', label:'التقلب VIX'},
+  {tid:'SP:SPX', symbol:'US500', label:'S&P 500'}
+];
+var LIVE_MACRO_CACHE = {at:0, data:null};
+async function liveMacro(force){
+  if(!force && LIVE_MACRO_CACHE.data && Date.now()-LIVE_MACRO_CACHE.at<45000) return LIVE_MACRO_CACHE.data;
+  const body={symbols:{tickers:MACRO_LIVE.map(m=>m.tid),query:{types:[]}},
+    columns:['close','change','update_time','update_mode']};
+  const r=await fetch('https://scanner.tradingview.com/global/scan',
+    {method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body),cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const d=await r.json();
+  const rows={};
+  (d.data||[]).forEach(row=>{ rows[row.s]=row.d; });
+  const out=MACRO_LIVE.map(m=>{
+    const d=rows[m.tid]; if(!d) return null;
+    const close=Number(d[0]), change=Number(d[1]), upd=Number(d[2]);
+    if(!isFinite(close)) return null;
+    return {symbol:m.symbol,label:m.label,price:+close.toFixed(4),
+      change_pct:isFinite(change)?+change.toFixed(2):null,
+      as_of:isFinite(upd)&&upd>0?new Date(upd*1000).toISOString():null,
+      update_mode:d[3]||null};
+  }).filter(Boolean);
+  if(out.length) LIVE_MACRO_CACHE={at:Date.now(),data:out};
+  return out;
+}
+
 async function liveGoldSnapshot(interval='H1'){
-  const raw = await fetchGoldCandles(interval);
+  const [raw, spot, macro] = await Promise.all([
+    fetchGoldCandles(interval),
+    fetchGoldSpot(),
+    liveMacro().catch(()=>[])
+  ]);
   if(raw.length < 60) throw new Error('gold candles too few');
-  const spot = await fetchGoldSpot();
   let factor = 1;
   const paxLast = raw[raw.length-1].c;
   if(spot && paxLast>0){
@@ -659,18 +695,21 @@ async function liveGoldSnapshot(interval='H1'){
     symbol:'XAUUSD', label:SYMBOLS.XAUUSD.label, interval,
     generated_at:new Date().toISOString().slice(0,19),
     live:true, source:'Binance PAXG/USDT + gold-api spot', basis_pct:GOLD_BASIS,
+    as_of:new Date().toISOString(),
     indicators:indicators(cs),
     recent_candles:cs.slice(-16).map(c=>({t:new Date(c.t*1000).toISOString().slice(0,16).replace('T',' '),
       o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
     chart:cs.slice(-80).map(c=>({t:c.t,o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
-    macro:[], news:[], warnings
+    macro, news:[], warnings
   };
 }
 
 /* ---------- rendering ---------- */
-function renderIndicators(ind){
+function renderIndicators(ind, ageText){
   const labels={last:'السعر',change_pct:'تغير %',ema20:'EMA20',ema50:'EMA50',sma200:'SMA200',rsi14:'RSI14',atr14:'ATR14',atr_pct:'ATR %',bb_upper:'BB upper',bb_lower:'BB lower',stoch_k:'Stoch',high20:'قمة 20',low20:'قاع 20',trend:'الاتجاه',bars:'شموع'};
-  return Object.entries(labels).filter(([k])=>ind[k]!==null&&ind[k]!==undefined).map(([k,l])=>`<span class="chip">${esc(l)}: <b>${esc(ind[k])}</b></span>`).join('');
+  return Object.entries(labels).filter(([k])=>ind[k]!==null&&ind[k]!==undefined)
+    .map(([k,l])=>`<span class="chip">${esc(l)}: <b>${esc(ind[k])}</b>${
+      ageText?`<i class="age">${esc(ageText)}</i>`:''}</span>`).join('');
 }
 function renderMarket(m){
   if(!m) return '';
