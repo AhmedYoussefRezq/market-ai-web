@@ -2,7 +2,7 @@
 
 const LS_KEY = 'market-ai-providers-v1';
 const CACHE_KEY = 'market-ai-cache-v1';
-const MAX_MODELS = 20;
+const MAX_MODELS = 30;
 
 const SYMBOLS = {
   XAUUSD: {label:'Gold / الذهب', yahoo:'GC=F', query:'gold price XAUUSD', kind:'metal'},
@@ -34,6 +34,23 @@ const TEMPLATES = [
   {name:'openai', base_url:'https://api.openai.com/v1', model:'gpt-4o-mini', api_key:'', enabled:true},
   {name:'custom', base_url:'', model:'', api_key:'', enabled:true}
 ];
+// One key from these providers can drive several models in parallel.
+// IDs checked against the live OpenRouter / Groq / Cerebras catalogs (Nov 2026).
+const FREE_MODEL_SETS = {
+  openrouter:{label:'OpenRouter', base:'https://openrouter.ai/api/v1', models:[
+    'inclusionai/ling-3.2-flash:free','baidu/ernie-5.5-flash-preview:free',
+    'liquid/lfm-3-1.7b:free','particle-ai/particle-1:free','recursive/flint-v1.0:free',
+    'nvidia/nemotron-3.5-super-vl:free','nvidia/nemotron-3.5-lightning:free',
+    'nvidia/nemotron-3-ultra-550b-a55b:free','nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    'google/gemma-4-26b-a4b-it:free','google/gemma-4-31b-it:free'
+  ]},
+  groq:{label:'Groq', base:'https://api.groq.com/openai/v1', models:[
+    'openai/gpt-oss-120b','openai/gpt-oss-20b','llama-3.3-70b-versatile','llama-3.1-8b-instant'
+  ]},
+  cerebras:{label:'Cerebras', base:'https://api.cerebras.ai/v1', models:[
+    'gpt-oss-120b','qwen-3.8-27b'
+  ]}
+};
 
 const SYSTEM_PROMPT = `You are a disciplined institutional multi-asset trade analyst.
 You receive REAL market data: price candles, indicators, macro instruments and news headlines.
@@ -109,7 +126,8 @@ function cacheSet(key,value){
 /* ---------- provider UI ---------- */
 function renderProviders(){
   const list = providers();
-  el('keyCount').textContent = list.filter(p=>p.api_key).length;
+  el('keyCount').textContent = new Set(list.filter(p=>p.api_key).map(p=>p.api_key)).size;
+  el('modelCount').textContent = list.filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
   el('providerList').innerHTML = list.length ? list.map(p=>`
     <div class="provider"><b>${esc(p.name)}</b> <span class="tiny">${esc(p.model)}</span>
       <div class="tiny">${p.api_key?'المفتاح محفوظ':'مفيش مفتاح'} · ${p.enabled?'مفعّل':'متوقف'}</div>
@@ -122,6 +140,24 @@ function addTemplates(){
   const list = providers();
   TEMPLATES.forEach(t=>{ if(!list.some(p=>p.name===t.name)) list.push({...t}); });
   saveProviders(list); renderProviders();
+}
+// Expand one saved key into every free model that provider currently offers.
+function addFreeModels(source){
+  const set = FREE_MODEL_SETS[source];
+  if(!set) return;
+  const list = providers();
+  const owner = list.find(p=>p.name.toLowerCase()===source);
+  if(!owner || !owner.api_key){ err('ضيف مفتاح '+set.label+' الأول في خانة المزود، وبعدين اضغط الزر.'); return; }
+  const base = (owner.base_url || set.base).replace(/\/$/,'');
+  let added = 0;
+  set.models.forEach(model=>{
+    if(list.some(p=>p.model===model && (p.base_url||'').replace(/\/$/,'')===base)) return;
+    const name = source+'-'+model.split('/').pop().replace(/[^a-z0-9._-]/gi,'-');
+    list.push({name,base_url:base,model,api_key:owner.api_key,enabled:true});
+    added++;
+  });
+  saveProviders(list); renderProviders();
+  err(added ? `اتضافت ${added} نماذج مجانية من ${set.label} — كلهم هيحللوا بالتوازي.` : `كل نماذج ${set.label} موجودة بالفعل.`);
 }
 function saveProvider(){
   const name = el('pName').value.trim();
