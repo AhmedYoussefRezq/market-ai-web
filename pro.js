@@ -14,12 +14,9 @@ const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد أبحاث تداول 
 7) إذا كانت بيانات السوق قديمة أو بها تحذيرات، اذكر ذلك في بداية الرد.`;
 
 const PRO_PROMPTS = [
-  'حلّل الأداة الحالية دلوقتي: الاتجاه، الزخم، وأهم مستويات الدعم والمقاومة.',
-  'إيه رأيك في إشارة الاستراتيجية المختبرة؟ وليه ما ندخلش في نص الحركة؟',
-  'احسب لي حجم اللوت لو رأس المال 1000$ ونسبة المخاطرة 1%.',
-  'لخّص الأخبار المرفقة وتأثيرها المحتمل على الأداة.',
-  'اشرح الفرق بين الزخم اللحظي والارتداد على M15، وليه M15 أفضل هنا.',
-  'قارن بين الذهب والبيتكوين من ناحية السبريد والتذبذب.'
+  'حلّل الأداة الحالية وأعطني توصية',
+  'إيه رأيك في الإشارة الحالية؟',
+  'احسب حجم اللوت بـ 1% مخاطرة'
 ];
 
 var PRO_CTX = null;
@@ -66,8 +63,8 @@ function proUpdate(id,text,meta){
 function proRenderChat(){
   const box=proEl('chat'); if(!box) return;
   const all=proChat();
-  const aiAv='<span class="avatar ai"><svg class="ico"><use href="#i-logo"/></svg></span>';
-  const meAv='<span class="avatar me">أنت</span>';
+  const aiAv='<span class="mark">AI</span>';
+  const meAv='';
   if(!all.length){
     box.innerHTML='<div class="msg bot">'+aiAv+'<div class="bubble"><div class="who"><b>Market AI Pro</b></div>'+
       '<div class="body">أهلاً! اسألني عن السوق أو اطلب تحليل أداة معينة. أنا بشوف بيانات السوق والباكتيست المرفقة قبل ما أجاوب — '+
@@ -289,11 +286,10 @@ function renderRec(r){
   const targets=Array.isArray(r.targets)?r.targets.join(' / '):fmt(r.targets);
   out.innerHTML=[
     ['الاتجاه','<b class="rec-dir '+cls+'">'+esc(dir)+'</b>'],
-    ['الدخول',esc(fmt(r.entry))],['الوقف',esc(fmt(r.stop))],['الأهداف',esc(targets)],
-    ['العائد/المخاطرة',esc(fmt(r.rr))],
-    ['الشروط',esc(fmt(r.conditions||r.wait_conditions))],
-    ['تحذير',esc(fmt(r.risk||r.risk_note))]
-  ].map(x=>'<div class="rec-row"><span>'+x[0]+'</span>'+x[1]+'</div>').join('');
+    ['الدخول',esc(fmt(r.entry))],['الوقف',esc(fmt(r.stop))],['الهدف',esc(targets)],
+    ['R:R',esc(fmt(r.rr))]
+  ].map(x=>'<div class="rec-row"><span>'+x[0]+'</span>'+x[1]+'</div>').join('')+
+    '<p class="rec-note">'+esc(fmt(r.conditions||r.wait_conditions))+' · '+esc(fmt(r.risk||r.risk_note))+'</p>';
 }
 async function proRecommend(){
   if(PRO_BUSY) return;

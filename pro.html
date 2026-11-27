@@ -3,21 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#070b12">
+<meta name="theme-color" content="#080c12">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Market AI Pro — مساعد التحليل</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css?v=10">
-<link rel="stylesheet" href="pro.css?v=3">
+<link rel="stylesheet" href="pro.css?v=4">
 </head>
 <body class="pro">
 
 <svg class="sprite" aria-hidden="true" width="0" height="0">
   <symbol id="i-logo" viewBox="0 0 24 24"><path d="M3 17.5l5.5-6 4 3.5L18 6l3 5"/><path d="M3 21h18"/><path d="M3 3v18"/></symbol>
-  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M7 9h10M7 13h6"/></symbol>
-  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/></symbol>
   <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9 2 2-2 2 2 2-3 3-2-2-2 2"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></symbol>
@@ -25,102 +23,62 @@
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
-  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
-  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></symbol>
   <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7M10 14L21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></symbol>
-  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
 </svg>
 
 <header class="topbar">
   <div class="brand">
     <span class="brand-mark"><svg class="ico"><use href="#i-logo"/></svg></span>
-    <div class="brand-text">
-      <h1>Market AI <em>Pro</em></h1>
-      <p>مساعد تحليل ذكي · بيانات فعلية · يعمل من أي هاتف</p>
-    </div>
+    <h1>Market AI <em>Pro</em></h1>
+    <span class="pill">ANALYSIS ONLY</span>
   </div>
-  <div class="topbar-actions">
-    <span class="status-pill"><i></i> ANALYSIS ONLY</span>
-    <a class="top-link" href="index.html"><svg class="ico"><use href="#i-external"/></svg><span>الكلاسيكية</span></a>
-    <button class="top-btn" onclick="toggleProSettings()"><svg class="ico"><use href="#i-key"/></svg><span>ربط AI</span></button>
-    <button class="icon-btn only-mobile" onclick="toggleSidebar()" aria-label="القائمة"><svg class="ico"><use href="#i-menu"/></svg></button>
+  <div class="top-actions">
+    <a class="link-icon" href="index.html" title="النسخة الكلاسيكية"><svg class="ico"><use href="#i-external"/></svg></a>
+    <button class="key-btn" onclick="toggleProSettings()"><svg class="ico"><use href="#i-key"/></svg><span>ربط AI</span></button>
   </div>
 </header>
 
-<div class="controlbar">
-  <div class="seg">
-    <label><span>الأداة</span><select id="proSymbol"></select></label>
-    <label><span>الفريم</span><select id="proInterval">
-      <option value="M15">M15</option><option value="M30">M30</option>
-      <option value="H1" selected>H1</option><option value="H4">H4</option><option value="D1">D1</option>
-    </select></label>
-    <label><span>الموديل</span><select id="proModel"></select></label>
-  </div>
-  <label class="switch"><input type="checkbox" id="proConsensus"><span class="track"></span><span>توافق عدة موديلات</span></label>
-  <button class="soft-btn" id="ctxBtn" onclick="refreshContext()"><svg class="ico"><use href="#i-refresh"/></svg><span>تحديث البيانات</span></button>
+<div class="toolbar">
+  <label>الأداة<select id="proSymbol"></select></label>
+  <label>الفريم<select id="proInterval">
+    <option value="M15">M15</option><option value="M30">M30</option>
+    <option value="H1" selected>H1</option><option value="H4">H4</option><option value="D1">D1</option>
+  </select></label>
+  <label>الموديل<select id="proModel"></select></label>
+  <button class="icon-btn" id="ctxBtn" onclick="refreshContext()" title="تحديث البيانات"><svg class="ico"><use href="#i-refresh"/></svg></button>
 </div>
 
-<div class="rail-backdrop" id="railBackdrop" onclick="toggleSidebar()"></div>
-
 <div class="workspace">
-  <aside class="rail" id="rail">
+  <aside class="rail">
     <section class="panel">
-      <div class="panel-head"><svg class="ico"><use href="#i-chart"/></svg><h2>سياق التحليل</h2><span class="mini-tag">CONTEXT</span></div>
-      <p class="stamp" id="ctxStamp">لسه مفيش بيانات — اكتب سؤال أو اضغط «تحديث البيانات».</p>
-      <div id="ctxInd" class="chips"></div>
+      <div class="panel-head"><span>التوصية الحالية</span><button class="mini-btn" id="recBtn" onclick="proRecommend()">توليد</button></div>
+      <div id="recOut" class="rec-out"><p class="muted">اضغط «توليد» لتحليل السوق وإعطاء دخول ووقف وهدف.</p></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><span>السوق</span><span class="muted tiny" id="ctxStamp">—</span></div>
       <div id="ctxChart" class="ctx-chart"></div>
-      <div class="subhead">الاستراتيجية المختبرة</div>
-      <div id="ctxStrat" class="tiny"></div>
-      <p class="warn" id="ctxWarnings"></p>
+      <div id="ctxInd" class="chips"></div>
     </section>
-
-    <section class="panel rec-panel">
-      <div class="panel-head"><svg class="ico"><use href="#i-check"/></svg><h2>التوصية الحالية</h2></div>
-      <div id="recOut" class="rec-out"><p class="note tiny">اضغط «أنشئ توصية» عشان الموديل يطلع دخول ووقف وهدف من البيانات الحالية.</p></div>
-      <button class="soft-btn" id="recBtn" onclick="proRecommend()"><svg class="ico"><use href="#i-bolt"/></svg> أنشئ توصية</button>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head"><svg class="ico"><use href="#i-bolt"/></svg><h2>توصيات سريعة</h2></div>
-      <div id="quickPrompts" class="prompt-list"></div>
-      <p class="note tiny">الأسئلة بتروح للموديل ومعاها بيانات السوق والباكتيست الحالية — مش إجابات محفوظة.</p>
-    </section>
-
-    <section class="panel safety">
-      <div class="panel-head"><svg class="ico"><use href="#i-shield"/></svg><h2>قواعد الاستخدام</h2></div>
-      <ul>
-        <li>التطبيق <b>تحليل فقط</b> — مفيش أوامر ولا فلوس.</li>
-        <li>المفاتيح بتتخزن في متصفحك بس.</li>
-        <li>الـ AI ممكن يغلط، والبيانات التاريخية مش ضمان.</li>
-      </ul>
-    </section>
+    <p class="foot-note">تحليل وتوصيات فقط — بدون تنفيذ أوامر. الـ AI ممكن يغلط، راجع الأرقام بنفسك.</p>
   </aside>
 
-  <main class="conversation">
-    <div class="conv-head">
-      <div class="conv-id">
-        <span class="avatar ai"><svg class="ico"><use href="#i-logo"/></svg></span>
-        <div><b>مساعد التداول</b><small>تحليل وتوصيات من السياق الحالي · بالعربية المصرية</small></div>
-      </div>
-      <span class="conv-badge"><svg class="ico"><use href="#i-shield"/></svg> تحليل فقط</span>
-    </div>
-
-    <div id="err" class="err pro-err" role="status"></div>
+  <main class="chat-wrap">
+    <div id="err" class="err" role="status"></div>
     <div id="chat" class="chat"></div>
-
     <div class="composer">
+      <div id="quickPrompts" class="suggest"></div>
       <div class="input-wrap">
-        <textarea id="proInput" rows="2" dir="rtl" placeholder="اسأل عن السوق، إشارة، مخاطرة، أو اطلب شرح استراتيجية..."></textarea>
+        <textarea id="proInput" rows="2" dir="rtl" placeholder="اسأل عن السوق أو اطلب تحليل..."></textarea>
         <button id="sendBtn" class="send-btn" onclick="proSend()"><svg class="ico"><use href="#i-send"/></svg><span>إرسال</span></button>
       </div>
       <div class="composer-foot">
-        <span class="hint">Enter للإرسال · Shift + Enter لسطر جديد</span>
+        <span class="muted tiny" id="chatMeta"></span>
         <div class="tools">
-          <button class="icon-btn" onclick="clearChat()" title="مسح المحادثة"><svg class="ico"><use href="#i-trash"/></svg></button>
-          <button class="icon-btn" onclick="exportChat()" title="تصدير المحادثة"><svg class="ico"><use href="#i-download"/></svg></button>
+          <button class="icon-btn" onclick="clearChat()" title="مسح"><svg class="ico"><use href="#i-trash"/></svg></button>
+          <button class="icon-btn" onclick="exportChat()" title="تصدير"><svg class="ico"><use href="#i-download"/></svg></button>
         </div>
-        <span class="tiny" id="chatMeta"></span>
       </div>
     </div>
   </main>
@@ -129,45 +87,37 @@
 <div class="overlay" id="settingsOverlay" onclick="toggleProSettings(event)" style="display:none">
   <div class="drawer" id="proSettings" onclick="event.stopPropagation()">
     <div class="drawer-head">
-      <div>
-        <h2><svg class="ico"><use href="#i-key"/></svg> ربط AI من الموبايل</h2>
-        <p class="note">مفتاح واحد من أي مزود يفعّل كل موديلاته فوراً — ويتحفظ في هذا المتصفح فقط.</p>
-      </div>
-      <button class="icon-btn" onclick="toggleProSettings()" aria-label="إغلاق"><svg class="ico"><use href="#i-close"/></svg></button>
+      <h2><svg class="ico"><use href="#i-key"/></svg> ربط AI</h2>
+      <button class="icon-btn" onclick="toggleProSettings()" title="إغلاق"><svg class="ico"><use href="#i-close"/></svg></button>
     </div>
+    <p class="muted">مفتاح واحد يفعّل موديلات المزود. المفاتيح بتتخزن في هذا المتصفح فقط.</p>
 
-    <div class="key-card featured">
-      <div class="key-title"><span class="step">١</span><b>OpenRouter</b><a href="https://openrouter.ai/keys" target="_blank" rel="noopener">افتح صفحة المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div>
+    <div class="key-card primary">
+      <div class="key-title"><b>OpenRouter</b><a href="https://openrouter.ai/keys" target="_blank" rel="noopener">احصل على مفتاح <svg class="ico"><use href="#i-external"/></svg></a></div>
       <input id="quickKey" type="password" dir="ltr" autocomplete="off" placeholder="sk-or-...">
       <button onclick="proQuickProvider('openrouter')">حفظ وتفعيل 10 موديلات مجانية</button>
     </div>
 
-    <div class="key-grid">
-      <div class="key-card"><div class="key-title"><span class="step">٢</span><b>Groq</b><a href="https://console.groq.com/keys" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="groqKey" type="password" dir="ltr" autocomplete="off" placeholder="gsk_..."><button class="soft-btn" onclick="proQuickProvider('groq')">تفعيل 4 موديلات</button></div>
-      <div class="key-card"><div class="key-title"><span class="step">٣</span><b>Cerebras</b></div><input id="cerebrasKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"><button class="soft-btn" onclick="proQuickProvider('cerebras')">تفعيل موديلين</button></div>
-      <div class="key-card"><div class="key-title"><span class="step">٤</span><b>Google Gemini</b><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="geminiKey" type="password" dir="ltr" autocomplete="off" placeholder="AIza..."><button class="soft-btn" onclick="proQuickProvider('gemini')">تفعيل 4 موديلات</button></div>
-      <div class="key-card"><div class="key-title"><span class="step">٥</span><b>Hugging Face</b><a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">التوكن <svg class="ico"><use href="#i-external"/></svg></a></div><input id="hfKey" type="password" dir="ltr" autocomplete="off" placeholder="hf_..."><button class="soft-btn" onclick="proQuickProvider('huggingface')">تفعيل 4 موديلات</button></div>
-      <div class="key-card"><div class="key-title"><span class="step">٦</span><b>Mistral</b><a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="mistralKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"><button class="soft-btn" onclick="proQuickProvider('mistral')">تفعيل 3 موديلات</button></div>
-    </div>
+    <details>
+      <summary>مزودين أخرى</summary>
+      <div class="key-card"><div class="key-title"><b>Groq</b><a href="https://console.groq.com/keys" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="groqKey" type="password" dir="ltr" autocomplete="off" placeholder="gsk_..."><button class="secondary" onclick="proQuickProvider('groq')">تفعيل 4 موديلات</button></div>
+      <div class="key-card"><div class="key-title"><b>Gemini</b><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="geminiKey" type="password" dir="ltr" autocomplete="off" placeholder="AIza..."><button class="secondary" onclick="proQuickProvider('gemini')">تفعيل 4 موديلات</button></div>
+      <div class="key-card"><div class="key-title"><b>Hugging Face</b><a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">التوكن <svg class="ico"><use href="#i-external"/></svg></a></div><input id="hfKey" type="password" dir="ltr" autocomplete="off" placeholder="hf_..."><button class="secondary" onclick="proQuickProvider('huggingface')">تفعيل 4 موديلات</button></div>
+      <div class="key-card"><div class="key-title"><b>Cerebras</b></div><input id="cerebrasKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"><button class="secondary" onclick="proQuickProvider('cerebras')">تفعيل موديلين</button></div>
+      <div class="key-card"><div class="key-title"><b>Mistral</b><a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="mistralKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"><button class="secondary" onclick="proQuickProvider('mistral')">تفعيل 3 موديلات</button></div>
+    </details>
 
-    <p class="note" id="quickMsg"></p>
-    <div class="drawer-stats">
-      <button class="soft-btn" onclick="proKeyAction('status')"><svg class="ico"><use href="#i-check"/></svg> حالة الحفظ</button>
-      <span>مفاتيح: <b id="keyCount">0</b></span>
-      <span>نماذج: <b id="modelCount">0</b></span>
+    <p class="muted" id="quickMsg"></p>
+    <div class="drawer-foot">
+      <button class="secondary small" onclick="proKeyAction('status')">حالة الحفظ</button>
+      <span class="muted tiny">مفاتيح: <b id="keyCount">0</b> · نماذج: <b id="modelCount">0</b></span>
     </div>
     <div id="providerList"></div>
-
-    <p class="note tiny">مفيش مفتاح؟ ابدأ بـ OpenRouter أو Gemini — التسجيل مجاني. متشاركش المفتاح مع حد.</p>
-    <details>
-      <summary>خيار متقدم: جسر الكمبيوتر</summary>
-      <button class="soft-btn" onclick="proUseLocalBridge()">استخدم Groq من مفتاح الجهاز</button>
-      <p class="note tiny">بيقرأ <code>GROQ_API_KEY</code> من متغيرات البيئة على الكمبيوتر، ومش بيظهر في المتصفح. شغال على localhost بس — مش مناسب للموبايل.</p>
-    </details>
+    <details class="advanced"><summary>خيار متقدم: جسر الكمبيوتر</summary><button class="secondary" onclick="proUseLocalBridge()">استخدم Groq من مفتاح الجهاز</button><p class="muted tiny">يعمل على localhost فقط — مش للموبايل.</p></details>
   </div>
 </div>
 
 <script src="app.js?v=11"></script>
-<script src="pro.js?v=5"></script>
+<script src="pro.js?v=6"></script>
 </body>
 </html>
