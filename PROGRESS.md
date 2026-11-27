@@ -163,4 +163,5 @@
 - ✅ **منطق إشعار الخلفية كان غلط** (أخطر خطأ): الـ `prev RSI` كان بيتقرأ من أول شمعة مش من الشمعة اللي قبل الأخيرة → إشارات BUY/SELL وهمية. اتصحّح لـ Wilder RSI14 بنفس قواعد `stratSignal()` في `app.js`، والاختبار دلوقتي: `app=WAIT` و`SW=WAIT` (اتفاق)، و`rsi=41.2` مطابق.
 - ✅ **حماية إضافية**: `exportChat` ما بيقرفش دلوقتي لو رسالة قديمة متخزنة بدون `meta`؛ offline fallback للتنقل بيفتح `pro.html` بدل `index.html` لو الرابط ده؛ حد أدنى 12 ساعة لـ `periodicsync` لو المتصفح رفض 15 دقيقة؛ حذف كود ميت (`proConsensus` / `toggleSidebar` / `ctxStrat` / `ctxWarnings`).
 - ✅ اختبار نهائي: syntax لكل الملفات = 0 · 3 أسئلة · قسمين · 3 خطوط شارت · 2 مفتاح تبديل · Service Worker شغال · صفر console errors.
-- التالي: commit + push والتحقق من الرابط الحي.
+- ✅ commit `93d15ca` اترفع، Pages `built`، والنسخة الحية اتأكد منها (`pro.js?v=8` و`sw.js` v8 بالكود المصحّح) — الرابط: https://ahmedyoussefrezq.github.io/market-ai-web/pro.html
+- ✅ Step 15 اكتمل.
