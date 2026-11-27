@@ -412,15 +412,15 @@ async function proSend(preset){
 /* ---------- automatic analysis + phone alerts ---------- */
 var AUTO_TIMER=null;
 function proSignalKey(sym,tf){ return 'market-ai-signal-'+sym+'-'+tf; }
-function proNotify(sym,tf,sig){
-  const body=sym+' / '+tf+' · '+sig.bias+' · دخول '+fmt(sig.entry)+' · وقف '+fmt(sig.sl)+' · هدف '+fmt(sig.tp);
+function proNotifyRec(sym,tf,rec){
+  const targets=Array.isArray(rec.targets)?rec.targets.join(' / '):fmt(rec.targets);
+  const body=sym+' / '+tf+' · '+String(rec.bias||'').toUpperCase()+' · دخول '+fmt(rec.entry)+' · وقف '+fmt(rec.stop)+' · هدف '+targets;
   const toast=proEl('autoToast');
-  if(toast){ toast.textContent='تنبيه صفقة: '+body; toast.style.display='block';
-    setTimeout(()=>{ toast.style.display='none'; },14000); }
+  if(toast){ toast.textContent='تنبيه AI: '+body; toast.style.display='block';
+    setTimeout(()=>{ toast.style.display='none'; },16000); }
   if('Notification' in window && Notification.permission==='granted'){
-    const title='Market AI Pro — صفقة محتملة';
-    const opts={body,icon:'icon-192.png',tag:'market-ai-signal',data:{url:'./pro.html'}};
-    // Chrome on Android blocks `new Notification()` — go through the service worker first.
+    const title='Market AI Pro — توصية AI';
+    const opts={body,icon:'icon-192.png',tag:'market-ai-ai',data:{url:'./pro.html'}};
     if('serviceWorker' in navigator){
       navigator.serviceWorker.ready
         .then(reg=>reg.showNotification(title,opts))
@@ -432,23 +432,36 @@ function proNotify(sym,tf,sig){
 }
 async function proAutoAnalyze(){
   const sym=proEl('proSymbol')?.value||'XAUUSD', tf=proEl('proInterval')?.value||'H1';
-  const useTf=['D1','H4','H1'].includes(tf)?tf:'D1';
+  // Keep context fresh so AI sees latest market+news.
+  if(!PRO_CTX || Date.now()-PRO_CTX_AT > 4*60*1000){
+    try{ PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now(); refreshContext(); }catch(e){}
+  }
+  const models=proActiveModels();
+  if(!models.length) return null;
+  // Use a single model for auto (faster, less quota); manual button uses all.
+  const p=models[0];
+  const q='أعطني توصية عملية مبنية على السياق المرفق فقط. أرجع JSON فقط بالحقول: bias (BUY أو SELL أو WAIT)، entry، stop، targets (مصفوفة)، rr، conditions، risk. مفيش وعود ربح.';
+  const messages=[{role:'system',content:PRO_SYSTEM+' أرجع JSON فقط بالحقول المطلوبة، بدون أي نص إضافي.'},
+    {role:'user',content:JSON.stringify({question:q,context:PRO_CTX})}];
   try{
-    const h=await loadHistory(sym,useTf);
-    const sig=stratSignal(h.candles);
-    const bias=sig?.bias||'WAIT', key=proSignalKey(sym,tf);
-    const last=localStorage.getItem(key)||'';
-    if(bias!==last){
-      localStorage.setItem(key,bias);
-      if(bias!=='WAIT') proNotify(sym,useTf,sig);
-    }
-    return sig;
+    const r=await proCallChat(p,messages,null);
+    if(!r.ok){ markProviderFail(p); return null; }
+    markProviderOK(p);
+    const o=parseJSON(r.text);
+    if(!o || !o.bias) return null;
+    const rec={...o,_model:p.name};
+    const last=proLoadRec();
+    const changed=!last || last.bias!==rec.bias || String(last.entry)!==String(rec.entry) || String(last.stop)!==String(rec.stop);
+    proSaveRec(rec); renderRec(rec);
+    if(changed && String(rec.bias).toUpperCase()!=='WAIT') proNotifyRec(sym,tf,rec);
+    return rec;
   }catch(e){ return null; }
 }
 function stopAuto(){ if(AUTO_TIMER){ clearInterval(AUTO_TIMER); AUTO_TIMER=null; } }
 function startAuto(mins){
   stopAuto();
-  const ms=(mins||15)*60*1000;
+  const m=mins||5;
+  const ms=m*60*1000;
   AUTO_TIMER=setInterval(proAutoAnalyze,ms);
   proAutoAnalyze();
 }
@@ -465,13 +478,13 @@ async function registerPeriodic(mins){
 }
 async function toggleAuto(){
   const box=proEl('proAuto'), on=!!box?.checked;
-  const prefs=proPrefs(); prefs.auto={on,mins:15}; proSavePrefs(prefs);
+  const prefs=proPrefs(); prefs.auto={on,mins:5}; proSavePrefs(prefs);
   if(on){
     if('Notification' in window && Notification.permission==='default'){
       try{ await Notification.requestPermission(); }catch(e){}
     }
-    startAuto(15); registerPeriodic(15);
-    err('التحليل التلقائي شغال — تنبيه لما تظهر إشارة جديدة.');
+    startAuto(5);
+    err('التحليل التلقائي شغال (كل 5 دق) — AI يحلل السوق+الأخبار ويرسل توصية عند التغير.');
   }else{
     stopAuto(); err('التحليل التلقائي متوقف.');
   }
@@ -500,9 +513,9 @@ function proInit(){
     });
   }
   const auto=proEl('proAuto'); if(auto){
-    const ap=proPrefs().auto||{on:false,mins:15};
+    const ap=proPrefs().auto||{on:false,mins:5};
     auto.checked=!!ap.on;
-    if(ap.on){ startAuto(ap.mins||15); registerPeriodic(ap.mins||15); }
+    if(ap.on){ startAuto(ap.mins||5); }
   }
   [proEl('proSymbol'),proEl('proInterval'),proEl('proModel')].forEach(n=>{
     if(n) n.addEventListener('change',()=>{
