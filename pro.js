@@ -66,9 +66,7 @@ function proRenderChat(){
   const aiAv='<span class="mark">AI</span>';
   const meAv='';
   if(!all.length){
-    box.innerHTML='<div class="msg bot">'+aiAv+'<div class="bubble"><div class="who"><b>Market AI Pro</b></div>'+
-      '<div class="body">أهلاً! اسألني عن السوق — أحلل بيانات السوق وأجيبك بوضوح. <b>تحليل بس</b>، بدون أوامر.'+
-      '<div class="foot"><button onclick="proConnect()"><svg class="ico"><use href="#i-key"/></svg> اربط AI مجاني</button></div></div></div></div>';
+    box.innerHTML='';
   }else{
     box.innerHTML=all.map(m=>{
       const meta=m.meta||{};
@@ -352,7 +350,7 @@ async function proSend(preset){
   err(''); proPush('user',text);
   const models=proActiveModels();
   if(!models.length){
-    const msg='لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح OpenRouter/Groq مجاني (تسجيل في دقيقة). المفتاح بيتحفظ في متصفح الهاتف بس، والتطبيق هيشتغل من غير أي كمبيوتر.';
+    const msg='لسه مفيش ذكاء اصطناعي مربوط. الموديلات المجانية محتاجة مفتاح (Groq/Gemini/Mistral/Cerebras/HF). المفتاح بيتحفظ في متصفح الهاتف بس، والتطبيق هيشتغل من غير أي كمبيوتر.';
     const id=proPush('bot',msg);
     const body=proFind(id)?.querySelector('.body');
     if(body) body.innerHTML=proMd(msg)+

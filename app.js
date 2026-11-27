@@ -170,7 +170,7 @@ function addFreeModels(source){
   saveProviders(list); renderProviders();
   err(added ? `اتضافت ${added} نماذج مجانية من ${set.label} — كلهم هيحللوا بالتوازي.` : `كل نماذج ${set.label} موجودة بالفعل.`);
 }
-// One paste is enough: save the key and expand all free OpenRouter models.
+// Save a key and expand all free models for that provider.
 function showSaveStatus(){
   const list = providers();
   const keys = new Set(list.filter(p=>p.api_key).map(p=>p.api_key)).size;
