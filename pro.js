@@ -482,7 +482,8 @@ async function toggleAuto(){
       try{ await Notification.requestPermission(); }catch(e){}
     }
     startAuto(5);
-    err('التحليل التلقائي شغال (كل 5 دق) — AI يحلل السوق+الأخبار ويرسل توصية عند التغير.');
+    registerPeriodic(720);
+    err('التحليل التلقائي شغال (كل 5 دق) — AI يحلل السوق+الأخبار ويرسل توصية عند التغير. تنبيه خلفي (خشن) كل ~12 ساعة.');
   }else{
     stopAuto(); err('التحليل التلقائي متوقف.');
   }
@@ -514,7 +515,7 @@ function proInit(){
   const auto=proEl('proAuto'); if(auto){
     const ap=proPrefs().auto||{on:false,mins:5};
     auto.checked=!!ap.on;
-    if(ap.on){ startAuto(ap.mins||5); }
+    if(ap.on){ startAuto(ap.mins||5); registerPeriodic(720); }
   }
   [proEl('proSymbol'),proEl('proInterval'),proEl('proModel')].forEach(n=>{
     if(n) n.addEventListener('change',()=>{

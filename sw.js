@@ -1,4 +1,4 @@
-const CACHE = 'market-ai-web-v14';
+const CACHE = 'market-ai-web-v15';
 // Relative to the service worker scope so it works on GitHub project Pages (/repo/).
 const ASSETS = ['./pro.html', './style.css', './pro.css', './app.js',
   './pro.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
@@ -13,7 +13,41 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
-// AI runs only while the app is open (keys stay in the browser). Background sync removed.
+// Background coarse check (no API keys in SW): rule-based filter only.
+// Notifies the user to open the app for full AI analysis.
+self.addEventListener('periodicsync', event => {
+  if (event.tag !== 'market-ai-check') return;
+  event.waitUntil((async () => {
+    try {
+      const r = await fetch('./data/history/XAUUSD.json', { cache: 'no-store' });
+      const d = await r.json();
+      const cl = (d.D1 || []).map(x => Number(x[4])).filter(x => isFinite(x));
+      if (cl.length < 60) return;
+      const ema = p => { const k = 2/(p+1); let e = cl[0]; for (let i=1;i<cl.length;i++) e = cl[i]*k + e*(1-k); return e; };
+      const p = 14; let g = 0, l = 0;
+      for (let i=1;i<=p;i++) { const diff = cl[i]-cl[i-1]; g += Math.max(diff,0); l += Math.max(-diff,0); }
+      g /= p; l /= p;
+      let rsi = l === 0 ? 100 : 100 - 100/(1+g/l), prev;
+      for (let i=p+1;i<cl.length;i++) {
+        const diff = cl[i]-cl[i-1];
+        g = (g*(p-1)+Math.max(diff,0))/p; l = (l*(p-1)+Math.max(-diff,0))/p;
+        prev = rsi; rsi = l === 0 ? 100 : 100 - 100/(1+g/l);
+      }
+      const up = prev <= 50 && rsi > 50, dn = prev >= 50 && rsi < 50;
+      const e20 = ema(20), e50 = ema(50);
+      const bias = up && e20 > e50 ? 'BUY' : dn && e20 < e50 ? 'SELL' : 'WAIT';
+      if (bias === 'WAIT') return;
+      const cache = await caches.open('market-ai-signals-v1');
+      const old = await cache.match('signal').then(x => x && x.text()).catch(() => null);
+      if (old === bias) return;
+      await cache.put('signal', new Response(bias));
+      await self.registration.showNotification('Market AI Pro — فرصة محتملة', {
+        body: 'XAUUSD / D1 · إشارة '+bias+' — افتح التطبيق للتحليل AI',
+        icon: 'icon-192.png', tag: 'market-ai-bg', data: { url: './pro.html' }
+      });
+    } catch (e) {}
+  })());
+});
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
