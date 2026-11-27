@@ -525,6 +525,49 @@ async function fetchNews(query, limit){
   if(items.length) cacheSet(cacheKey,items);
   return items;
 }
+/* ---------- live web search (Google News RSS via rss2json, CORS-open) ---------- */
+const WEB_SEARCH_TTL = 5*60*1000;
+var WEB_SEARCH_CACHE = null;
+
+function googleNewsRss(q){
+  return 'https://news.google.com/rss/search?q='+encodeURIComponent(q)+'&hl=en-US&gl=US&ceid=US:en';
+}
+async function fetchFeedViaRss2json(query, count=6){
+  const url='https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(googleNewsRss(query))+'&count='+count;
+  const d=await getJSON(url,15000);
+  if(!d || d.status!=='ok' || !Array.isArray(d.items)) throw new Error('feed failed');
+  return d.items.map(it=>{
+    const title=String(it.title||'').replace(/\s+/g,' ').trim();
+    const m=title.match(/^(.*)\s-\s([^-]{2,40})$/);
+    return {title:(m?m[1]:title).slice(0,200), source:(m?m[2]:(it.author||'')).slice(0,60),
+      published:it.pubDate||'', link:it.link||''};
+  }).filter(x=>x.title);
+}
+// Real internet search: pulls fresh headlines for the instrument before the AI answers.
+async function webResearch(symbol='XAUUSD', force=false){
+  if(!force && WEB_SEARCH_CACHE && WEB_SEARCH_CACHE.symbol===symbol && Date.now()-WEB_SEARCH_CACHE.at<WEB_SEARCH_TTL){
+    return WEB_SEARCH_CACHE.data;
+  }
+  const queries = symbol==='XAUUSD'
+    ? ['gold price XAUUSD','gold forecast Fed','dollar index US yields gold']
+    : [SYMBOLS[symbol].query, 'financial markets news'];
+  const gathered=[]; let feeds=0;
+  await Promise.all(queries.map(async q=>{
+    try{ (await fetchFeedViaRss2json(q,6)).forEach(it=>gathered.push({...it,query:q})); feeds++; }catch(e){}
+  }));
+  const seen=new Set(), results=[];
+  gathered.sort((a,b)=>(Date.parse(b.published)||0)-(Date.parse(a.published)||0));
+  for(const it of gathered){
+    const k=it.title.toLowerCase();
+    if(seen.has(k)) continue;
+    seen.add(k); results.push(it);
+    if(results.length>=12) break;
+  }
+  const data={queried_at:new Date().toISOString().slice(0,19), queries, feeds_ok:feeds, results};
+  if(feeds) WEB_SEARCH_CACHE={symbol, at:Date.now(), data};
+  return data;
+}
+
 async function fetchMacro(){
   const out=[];
   await Promise.all(MACRO.map(async sym=>{
@@ -566,6 +609,62 @@ async function marketSnapshot(symbol, interval){
     if(snap.macro.length<2) snap.macro=st.macro;
   }
   return snap;
+}
+
+/* ---------- live gold (XAUUSD) ---------- */
+// Binance PAXG/USDT is a free, CORS-open feed with real gold OHLC candles.
+// Its series is re-anchored to the live XAU spot so price/levels match the broker quote.
+const GOLD_PAIR = 'PAXGUSDT';
+const GOLD_TF = {M15:'15m', M30:'30m', H1:'1h', H4:'4h', D1:'1d'};
+var GOLD_BASIS = null;
+
+async function fetchGoldCandles(interval='H1'){
+  const iv = GOLD_TF[interval] || '1h';
+  const rows = await getJSON('https://api.binance.com/api/v3/klines?symbol='+GOLD_PAIR+'&interval='+iv+'&limit=500', 12000);
+  if(!Array.isArray(rows) || !rows.length) throw new Error('empty klines');
+  return rows.map(r=>({t:Math.floor(Number(r[0])/1000),o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}))
+    .filter(c=>isFinite(c.c)&&isFinite(c.o)&&isFinite(c.h)&&isFinite(c.l)&&c.h>=c.l);
+}
+
+async function fetchGoldSpot(){
+  try{
+    const d = await getJSON('https://api.gold-api.com/price/XAU', 6000);
+    const p = Number(d.price);
+    return isFinite(p) && p>0 ? p : null;
+  }catch(e){ return null; }
+}
+
+async function liveGoldSnapshot(interval='H1'){
+  const raw = await fetchGoldCandles(interval);
+  if(raw.length < 60) throw new Error('gold candles too few');
+  const spot = await fetchGoldSpot();
+  let factor = 1;
+  const paxLast = raw[raw.length-1].c;
+  if(spot && paxLast>0){
+    const f = spot/paxLast;
+    if(isFinite(f) && f>0.9 && f<1.1) factor = f;
+  }
+  GOLD_BASIS = factor===1 ? null : +((factor-1)*100).toFixed(3);
+  const cs = raw.map(c=>factor===1 ? {...c} :
+    {...c,o:c.o*factor,h:c.h*factor,l:c.l*factor,c:c.c*factor});
+  // Put the freshest tick into the forming candle so price and indicators are truly live.
+  const last = cs[cs.length-1];
+  const price = spot || last.c;
+  last.c = price;
+  last.h = Math.max(last.h, price);
+  last.l = Math.min(last.l, price);
+  const warnings = [];
+  if(!spot) warnings.push('سعر gold-api مش متاح — السعر المعروض من Binance PAXG');
+  return {
+    symbol:'XAUUSD', label:SYMBOLS.XAUUSD.label, interval,
+    generated_at:new Date().toISOString().slice(0,19),
+    live:true, source:'Binance PAXG/USDT + gold-api spot', basis_pct:GOLD_BASIS,
+    indicators:indicators(cs),
+    recent_candles:cs.slice(-16).map(c=>({t:new Date(c.t*1000).toISOString().slice(0,16).replace('T',' '),
+      o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
+    chart:cs.slice(-80).map(c=>({t:c.t,o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
+    macro:[], news:[], warnings
+  };
 }
 
 /* ---------- rendering ---------- */

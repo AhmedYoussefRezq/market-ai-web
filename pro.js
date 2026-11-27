@@ -11,7 +11,8 @@ const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد تحليل سوق. ق�
 4) لا وعود ربح، ولا توصية نهائية بالشراء/البيع. ذكّر بالمخاطرة.
 5) لو طلب تنفيذ صفقة، اعتذر: التطبيق للتحليل فقط.
 6) لا تقل «متأكد/مضمون». استخدم «البيانات تشير إلى...».
-7) إذا كانت البيانات قديمة/بها تحذيرات، اذكر ذلك أولاً.`;
+7) إذا كانت البيانات قديمة/بها تحذيرات، اذكر ذلك أولاً.
+8) لو فيه web_search في السياق، ده بحث حقيقي في الإنترنت: اعتمد عليه للأخبار الحديثة، واذكر عنوان الخبر وتاريخه عند الاستناد له، ولو نتايجه فاضية قول إن مفيش أخبار حديثة متاحة. متخترعش أخبار مش موجودة فيه.`;
 
 const PRO_PROMPTS = [
   'حلّل الأداة الحالية وأعطني توصية',
@@ -24,6 +25,7 @@ var PRO_CTX_AT = 0;
 var PRO_BUSY = false;
 
 function proEl(id){ return document.getElementById(id); }
+var PRO_LIVE_CHART=null;
 function proPrefs(){
   try{ return JSON.parse(localStorage.getItem(PRO_PREF_KEY)||'{}'); }catch(e){ return {}; }
 }
@@ -192,32 +194,73 @@ async function quickPrice(symbol){
   }
   return null;
 }
-async function buildProContext(){
+async function buildProContext(withBasics=true){
   const symbol=proEl('proSymbol')?.value||'XAUUSD';
   const interval=proEl('proInterval')?.value||'H1';
   const ctx={generated_at:new Date().toISOString().slice(0,19),instrument:symbol,timeframe:interval,mode:'ANALYSIS ONLY'};
   let livePrice=null;
-  try{ livePrice=await withTimeout(quickPrice(symbol),4000,null); }catch(e){}
-  let snap=null;
-  try{ snap=await withTimeout(staticSnapshot(symbol,interval),4000,null); }catch(e){}
-  if(!snap||!((snap.indicators||{}).last)){
-    try{ snap=await withTimeout(marketSnapshot(symbol,interval),9000,null); }catch(e){}
+  if(symbol!=='XAUUSD'){
+    try{ livePrice=await withTimeout(quickPrice(symbol),4000,null); }catch(e){}
   }
+  let snap=null;
+  // Gold runs on the live path first: real candles + live spot, indicators computed here.
+  if(symbol==='XAUUSD'){
+    try{ snap=await withTimeout(liveGoldSnapshot(interval),9000,null); }catch(e){}
+  }
+  if(!snap){
+    try{ snap=await withTimeout(staticSnapshot(symbol,interval),4000,null); }catch(e){}
+    if(!snap||!((snap.indicators||{}).last)){
+      try{ snap=await withTimeout(marketSnapshot(symbol,interval),9000,null); }catch(e){}
+    }
+  }
+  // Live path carries the //news/macro bits over so the AI never loses context.
+  let newsTitles=null;
+  if(snap && snap.live){
+    if(withBasics){
+      const base=await withTimeout(staticSnapshot(symbol,interval),3000,null);
+      if(base){
+        if(base.macro && base.macro.length) snap.macro=base.macro;
+        if(base.news && base.news.length) snap.news=base.news;
+        const bAge=base.generated_at&&isFinite(Date.parse(base.generated_at))?Date.now()-Date.parse(base.generated_at):Infinity;
+        if(bAge>2*3600*1000) (snap.warnings=snap.warnings||[]).push('الأخبار والماكرو من نسخة محفوظة ('+base.generated_at+') — السعر والمؤشرات لحظية.');
+      }
+    }else if(PRO_CTX && PRO_CTX.market){
+      snap.macro=PRO_CTX.market.macro||[];
+      newsTitles=PRO_CTX.market.news||[];
+    }
+  }
+  PRO_LIVE_CHART = (snap && snap.live && snap.chart && snap.chart.length>=20) ? snap.chart : null;
   if(snap&&((snap.indicators||{}).last||livePrice!==null)){
     const i=snap.indicators||{}, warnings=[...(snap.warnings||[])];
     const age=snap.generated_at&&isFinite(Date.parse(snap.generated_at))?Date.now()-Date.parse(snap.generated_at):Infinity;
-    if(age>24*3600*1000) warnings.push('بيانات المؤشرات من نسخة GitHub (قد تكون قديمة) — استخدم السعر اللحظي.');
-    if(livePrice!==null) warnings.push('سعر لحظي: '+livePrice);
+    if(!snap.live){
+      if(age>24*3600*1000) warnings.push('بيانات المؤشرات من نسخة GitHub (قد تكون قديمة) — استخدم السعر اللحظي.');
+      if(livePrice!==null) warnings.push('سعر لحظي: '+livePrice);
+    }
     ctx.market={label:snap.label||SYMBOLS[symbol]?.label,source_snapshot:snap.generated_at,
-      price:livePrice!==null?livePrice:i.last,last:livePrice!==null?livePrice:i.last,
+      source:snap.live?'live':'snapshot',basis_pct:snap.basis_pct??null,
+      price:snap.live?i.last:(livePrice!==null?livePrice:i.last),last:snap.live?i.last:(livePrice!==null?livePrice:i.last),
       snapshot_price:i.last,change_pct:i.change_pct,
       ema20:i.ema20,ema50:i.ema50,sma200:i.sma200,rsi14:i.rsi14,atr14:i.atr14,atr_pct:i.atr_pct,
       trend:i.trend,high20:i.high20,low20:i.low20,bars:i.bars,
       recent_candles:(snap.recent_candles||[]).slice(-8),
       macro:(snap.macro||[]).map(x=>({symbol:x.symbol,price:x.price,change_pct:x.change_pct,trend:x.trend})),
-      news:(snap.news||[]).slice(0,7).map(x=>x.title),warnings};
+      news:newsTitles || (snap.news||[]).slice(0,7).map(x=>x.title),warnings};
   }else{
     ctx.market={price:livePrice,error:'مفيش بيانات سوق متاحة دلوقتي — الموديل هيجاوب بدون أرقام سوق.'};
+  }
+
+  // Real internet search attached to the context the AI sees.
+  if(withBasics){
+    try{
+      const web=await withTimeout(webResearch(symbol),15000,null);
+      if(web && web.results && web.results.length){
+        ctx.web_search={queried_at:web.queried_at,
+          results:web.results.slice(0,8).map(r=>({title:r.title,source:r.source,published:r.published,link:r.link}))};
+      }
+    }catch(e){}
+  }else if(PRO_CTX && PRO_CTX.web_search){
+    ctx.web_search=PRO_CTX.web_search;
   }
 
   // Strategy/backtest intentionally omitted (user request): analysis only, no tested-strategy injection.
@@ -229,37 +272,93 @@ function emaSeries(vals,p){
   for(let i=1;i<vals.length;i++){ e=vals[i]*k+e*(1-k); out.push(e); }
   return out;
 }
+function paintCtxChart(cs){
+  const box=proEl('ctxChart'); if(!box) return;
+  const cl=(cs||[]).map(c=>c.c);
+  if(cl.length<20){ box.innerHTML=''; return; }
+  const e20=emaSeries(cl,20), e50=emaSeries(cl,50);
+  const all=[...cl,...e20,...e50], min=Math.min(...all), max=Math.max(...all), span=max-min||1;
+  const w=300,hgt=70,pad=4;
+  const line=a=>a.map((v,i)=>((pad+i*(w-2*pad)/(a.length-1)).toFixed(1)+','+(pad+(max-v)*(hgt-2*pad)/span).toFixed(1))).join(' ');
+  box.innerHTML='<svg viewBox="0 0 '+w+' '+hgt+'" preserveAspectRatio="none">'+
+    '<polyline points="'+line(cl)+'" fill="none" stroke="#2962ff" stroke-width="1.6"/>'+
+    '<polyline points="'+line(e20)+'" fill="none" stroke="#089981" stroke-width="1" opacity=".8"/>'+
+    '<polyline points="'+line(e50)+'" fill="none" stroke="#787b86" stroke-width="1" opacity=".8"/>'+
+    '</svg>';
+}
 function drawCtxChart(symbol,tf){
   const box=proEl('ctxChart'); if(!box) return;
+  if(PRO_LIVE_CHART && PRO_LIVE_CHART.length>=20){ paintCtxChart(PRO_LIVE_CHART.slice(-60)); return; }
   const useTf=['D1','H4','H1'].includes(tf)?tf:'D1';
-  loadHistory(symbol,useTf).then(h=>{
-    const cs=h.candles.slice(-60), cl=cs.map(c=>c.c);
-    if(cl.length<20){ box.innerHTML=''; return; }
-    const e20=emaSeries(cl,20), e50=emaSeries(cl,50);
-    const all=[...cl,...e20,...e50], min=Math.min(...all), max=Math.max(...all), span=max-min||1;
-    const w=300,hgt=70,pad=4;
-    const line=a=>a.map((v,i)=>((pad+i*(w-2*pad)/(a.length-1)).toFixed(1)+','+(pad+(max-v)*(hgt-2*pad)/span).toFixed(1))).join(' ');
-    box.innerHTML='<svg viewBox="0 0 '+w+' '+hgt+'" preserveAspectRatio="none">'+
-      '<polyline points="'+line(cl)+'" fill="none" stroke="#2962ff" stroke-width="1.6"/>'+
-      '<polyline points="'+line(e20)+'" fill="none" stroke="#089981" stroke-width="1" opacity=".8"/>'+
-      '<polyline points="'+line(e50)+'" fill="none" stroke="#787b86" stroke-width="1" opacity=".8"/>'+
-      '</svg>';
-  }).catch(()=>{ box.innerHTML=''; });
+  loadHistory(symbol,useTf).then(h=>paintCtxChart(h.candles.slice(-60))).catch(()=>{ box.innerHTML=''; });
 }
-async function refreshContext(){
+async function refreshContext(quiet){
   const btn=proEl('ctxBtn'), stamp=proEl('ctxStamp');
-  if(btn) btn.disabled=true;
-  if(stamp) stamp.textContent='جاري سحب بيانات السوق والباكتيست...';
+  if(btn && !quiet) btn.disabled=true;
+  if(stamp && !quiet) stamp.textContent='جاري سحب بيانات السوق...';
   try{
-    PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now();
+    PRO_CTX=await buildProContext(!quiet); PRO_CTX_AT=Date.now();
     const m=PRO_CTX.market||{};
-    if(stamp) stamp.textContent=(PRO_CTX.instrument||'')+' / '+(PRO_CTX.timeframe||'')+' · '+
-      (m.source_snapshot||PRO_CTX.generated_at)+(m.error?' · '+m.error:'');
+    if(stamp){
+      const t=new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      stamp.innerHTML=(m.source==='live'?'<span class="live-dot"></span>لحظي ':'')+
+        esc(PRO_CTX.instrument||'')+' / '+esc(PRO_CTX.timeframe||'')+' · '+esc(t)+(m.error?' · '+esc(m.error):'');
+    }
     const ind=proEl('ctxInd');
     if(ind) ind.innerHTML=renderIndicators(m).replace(/undefined/g,'-');
+    renderWebNews(PRO_CTX.web_search||null);
     drawCtxChart(PRO_CTX.instrument,PRO_CTX.timeframe);
   }catch(e){ if(stamp) stamp.textContent='خطأ في تحديث السياق: '+e.message; }
-  finally{ if(btn) btn.disabled=false; }
+  finally{ if(!quiet && btn) btn.disabled=false; }
+}
+/* Live gold ticker: refreshes price/indicators every 15s while the page is visible. */
+var LIVE_TIMER=null;
+function startLiveTicker(){
+  stopLiveTicker();
+  LIVE_TIMER=setInterval(function(){
+    if(document.hidden || PRO_BUSY) return;
+    if((proEl('proSymbol')?.value||'XAUUSD')!=='XAUUSD') return;
+    refreshContext(true);
+  },15000);
+}
+function stopLiveTicker(){ if(LIVE_TIMER){ clearInterval(LIVE_TIMER); LIVE_TIMER=null; } }
+
+/* ---------- internet search panel ---------- */
+function whenShort(iso){
+  // rss2json returns "YYYY-MM-DD HH:MM:SS" in UTC — parse it as UTC, not local time.
+  let s=String(iso||'');
+  if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) s=s.replace(' ','T')+'Z';
+  const t=Date.parse(s); if(!isFinite(t)) return '';
+  const m=Math.max(0,Math.round((Date.now()-t)/60000));
+  if(m<1) return 'الآن';
+  if(m<60) return m+'د';
+  const h=Math.round(m/60);
+  if(h<24) return h+'س';
+  return Math.round(h/24)+'ي';
+}
+function renderWebNews(web){
+  const box=proEl('ctxNews'); if(!box) return;
+  const rows=(web&&web.results)||[];
+  if(!rows.length){
+    box.innerHTML='<p class="muted tiny">بحث الإنترنت: مفيش نتائج دلوقتي — التحليل هيعتمد على بيانات السوق.</p>';
+    return;
+  }
+  box.innerHTML='<p class="muted tiny">بحث الإنترنت · '+rows.length+' نتيجة · '+esc(String(web.queried_at||'').slice(11,16))+' UTC</p>'+
+    rows.slice(0,5).map(r=>'<a class="news-item" href="'+esc(r.link||'#')+'" target="_blank" rel="noopener"><span>'+
+      esc(r.title)+'</span><i>'+esc(whenShort(r.published))+'</i></a>').join('');
+}
+async function ensureWebSearch(force){
+  const box=proEl('ctxNews');
+  if(!PRO_CTX) return null;
+  if(force && box) box.innerHTML='<p class="muted tiny">بيدور في الإنترنت...</p>';
+  let web=null;
+  try{ web=await withTimeout(webResearch(PRO_CTX.instrument||'XAUUSD',!!force),15000,null); }catch(e){}
+  if((!web || !web.results || !web.results.length) && window.WEB_SEARCH_CACHE) web=WEB_SEARCH_CACHE.data;
+  if(web && web.results && web.results.length){
+    PRO_CTX.web_search={queried_at:web.queried_at, results:web.results.slice(0,8)};
+  }
+  renderWebNews(PRO_CTX.web_search || web || null);
+  return PRO_CTX.web_search || null;
 }
 
 /* ---------- structured recommendation ---------- */
@@ -291,6 +390,7 @@ async function proRecommend(){
   if(!PRO_CTX||Date.now()-PRO_CTX_AT>10*60*1000){
     try{ PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now(); refreshContext(); }catch(e){}
   }
+  await ensureWebSearch(true);
   const q='أعطني توصية عملية مبنية على السياق المرفق فقط. أرجع JSON فقط بالحقول: bias (BUY أو SELL أو WAIT)، entry، stop، targets (مصفوفة)، rr، conditions، risk. مفيش وعود ربح.';
   const messages=[{role:'system',content:PRO_SYSTEM+' أرجع JSON فقط بالحقول المطلوبة، بدون أي نص إضافي.'},
     {role:'user',content:JSON.stringify({question:q,context:PRO_CTX})}];
@@ -362,6 +462,7 @@ async function proSend(preset){
     const stamp=proEl('ctxStamp'); if(stamp) stamp.textContent='بحدّث بيانات السوق قبل الرد...';
     try{ PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now(); refreshContext(); }catch(e){}
   }
+  await ensureWebSearch(true);
   const hist=proChat().slice(-5,-1).map(m=>({role:m.role==='user'?'user':'assistant',content:String(m.text||'').slice(0,700)}));
   const messages=[{role:'system',content:PRO_SYSTEM},...hist,
     {role:'user',content:JSON.stringify({question:text,context:PRO_CTX})}];
@@ -526,5 +627,6 @@ function proInit(){
     });
   });
   refreshContext();
+  startLiveTicker();
 }
 proInit();
