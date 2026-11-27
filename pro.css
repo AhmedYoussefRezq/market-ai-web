@@ -85,6 +85,16 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .chip b{color:var(--txt)}
 .chip .age{display:inline-block;margin-inline-start:5px;font-style:normal;font-size:9px;
   color:var(--muted);opacity:.85}
+.gate{margin-top:7px;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:5px;
+  padding:4px 7px;background:#0b0e11;line-height:1.6}
+.gate:empty{display:none}
+.gate.ok{border-color:rgba(8,153,129,.45);color:var(--green)}
+.gate.bad{border-color:rgba(242,54,69,.5);color:var(--red)}
+.gate.bad i{color:var(--muted);font-style:normal}
+.rec-block{border:1px solid rgba(242,54,69,.45);background:var(--red-soft);border-radius:6px;
+  padding:8px;font-size:11px;line-height:1.6}
+.rec-block b{color:var(--red)}
+.rec-block p{margin:4px 0 0}
 .macro-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
 .macro-cell{display:flex;align-items:baseline;gap:5px;background:#0b0e11;border:1px solid var(--line);
   border-radius:5px;padding:4px 7px;font-size:10.5px}

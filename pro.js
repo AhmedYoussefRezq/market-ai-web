@@ -12,7 +12,9 @@ const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد تحليل سوق. ق�
 5) لو طلب تنفيذ صفقة، اعتذر: التطبيق للتحليل فقط.
 6) لا تقل «متأكد/مضمون». استخدم «البيانات تشير إلى...».
 7) إذا كانت البيانات قديمة/بها تحذيرات، اذكر ذلك أولاً.
-8) لو فيه web_search في السياق، ده بحث حقيقي في الإنترنت: اعتمد عليه للأخبار الحديثة، واذكر عنوان الخبر وتاريخه عند الاستناد له، ولو نتايجه فاضية قول إن مفيش أخبار حديثة متاحة. متخترعش أخبار مش موجودة فيه.`;
+8) لو فيه web_search في السياق، ده بحث حقيقي في الإنترنت: اعتمد عليه للأخبار الحديثة، واذكر عنوان الخبر وتاريخه عند الاستناد له، ولو نتايجه فاضية قول إن مفيش أخبار حديثة متاحة. متخترعش أخبار مش موجودة فيه.
+9) الأخبار: المصدر الوحيد المسموح للبناء عليه هو web_search (بحث لحظي). أي شيء في archived_news أرشيف محفوظ بتاريخه — ذكره للسياق فقط، وممنوع تبني عليه توصية أو تقدّمه كخبر حديث. لو web_search فاضي، قول صراحة إن مفيش أخبار لحظية متاحة.
+10) لو quality_gate.pass=false، ممنوع تعطي BUY أو SELL: لازم WAIT أو شرح فقط، واذكر سبب الرفض (معامل الربح PF وعدد الصفقات المطلوب).`;
 
 const PRO_PROMPTS = [
   'حلّل الأداة الحالية وأعطني توصية',
@@ -26,6 +28,8 @@ var PRO_BUSY = false;
 
 function proEl(id){ return document.getElementById(id); }
 var PRO_LIVE_CHART=null;
+var PRO_CANDLES=null, PRO_CANDLES_TF=null;
+var GATE_CACHE={key:'',at:0,data:null};
 function proPrefs(){
   try{ return JSON.parse(localStorage.getItem(PRO_PREF_KEY)||'{}'); }catch(e){ return {}; }
 }
@@ -213,21 +217,21 @@ async function buildProContext(withBasics=true){
       try{ snap=await withTimeout(marketSnapshot(symbol,interval),9000,null); }catch(e){}
     }
   }
-  // Live path carries the //news/macro bits over so the AI never loses context.
-  let newsTitles=null;
+  // Saved news is only ever passed as a dated archive — never as fresh news.
+  let archived=null, archivedAt=null;
   if(snap && snap.live){
     if(withBasics){
       const base=await withTimeout(staticSnapshot(symbol,interval),3000,null);
       if(base){
         if((!snap.macro||!snap.macro.length) && base.macro && base.macro.length) snap.macro=base.macro;
-        if(base.news && base.news.length) snap.news=base.news;
-        const bAge=base.generated_at&&isFinite(Date.parse(base.generated_at))?Date.now()-Date.parse(base.generated_at):Infinity;
-        if(bAge>2*3600*1000) (snap.warnings=snap.warnings||[]).push('الأخبار من نسخة محفوظة ('+base.generated_at+') — السعر والمؤشرات والماكرو لحظية.');
+        if(base.news && base.news.length){ archived=base.news; archivedAt=base.generated_at; }
       }
-    }else if(PRO_CTX && PRO_CTX.market){
-      snap.macro=PRO_CTX.market.macro||[];
-      newsTitles=PRO_CTX.market.news||[];
+    }else if(PRO_CTX){
+      snap.macro=(PRO_CTX.market&&PRO_CTX.market.macro)||[];
+      if(PRO_CTX.archived_news) ctx.archived_news=PRO_CTX.archived_news;
     }
+    PRO_CANDLES=(snap.candles && snap.candles.length>=120) ? snap.candles : null;
+    PRO_CANDLES_TF=snap.interval||interval;
   }
   PRO_LIVE_CHART = (snap && snap.live && snap.chart && snap.chart.length>=20) ? snap.chart : null;
   if(snap&&((snap.indicators||{}).last||livePrice!==null)){
@@ -247,10 +251,27 @@ async function buildProContext(withBasics=true){
       recent_candles:(snap.recent_candles||[]).slice(-8),
       macro:(snap.macro||[]).map(x=>({symbol:x.symbol,label:x.label,price:x.price,
         change_pct:x.change_pct,as_of:x.as_of||null})),
-      news:newsTitles || (snap.news||[]).slice(0,7).map(x=>x.title),warnings};
+      warnings};
   }else{
     ctx.market={price:livePrice,error:'مفيش بيانات سوق متاحة دلوقتي — الموديل هيجاوب بدون أرقام سوق.'};
   }
+
+  if(!ctx.archived_news){
+    const savedNews=snap?snap.news:null;
+    if(savedNews && savedNews.length){ archived=savedNews; archivedAt=(snap&&snap.generated_at)||null; }
+    if(archived && archived.length){
+      ctx.archived_news={as_of:archivedAt||null,
+        note:'أرشيف محفوظ من نسخة سابقة — مش أخبار لحظية، ممنوع البناء عليه',
+        items:archived.slice(0,5).map(n=>({title:n.title,published:n.published||null,
+          age_hours:ageHours(n.published)}))};
+    }
+  }
+  // Quality gate: a weak backtested setup gets no trade recommendation.
+  try{
+    const g=await ensureGate();
+    ctx.quality_gate={pass:!!g.pass,pf:g.pf,trades:g.trades,minPF:g.minPF,minTrades:g.minTrades,
+      error:g.error||null,at:g.at||null};
+  }catch(e){}
 
   // Real internet search attached to the context the AI sees.
   if(withBasics){
@@ -258,14 +279,15 @@ async function buildProContext(withBasics=true){
       const web=await withTimeout(webResearch(symbol),15000,null);
       if(web && web.results && web.results.length){
         ctx.web_search={queried_at:web.queried_at,
-          results:web.results.slice(0,8).map(r=>({title:r.title,source:r.source,published:r.published,link:r.link}))};
+          results:web.results.slice(0,8).map(r=>({title:r.title,source:r.source,published:r.published,
+            age_min:newsAgeMin(r.published),link:r.link}))};
       }
     }catch(e){}
   }else if(PRO_CTX && PRO_CTX.web_search){
     ctx.web_search=PRO_CTX.web_search;
   }
 
-  // Strategy/backtest intentionally omitted (user request): analysis only, no tested-strategy injection.
+  // Backtest is used as a quality gate only (quality_gate) — no strategy levels are injected.
 
   return ctx;
 }
@@ -309,6 +331,7 @@ async function refreshContext(quiet){
     const ind=proEl('ctxInd');
     if(ind) ind.innerHTML=renderIndicators(m, ageLabel(m.as_of||m.indicators_as_of||m.source_snapshot)).replace(/undefined/g,'-');
     renderMacro(m.macro);
+    renderGate(PRO_CTX.quality_gate||null);
     renderWebNews(PRO_CTX.web_search||null);
     drawCtxChart(PRO_CTX.instrument,PRO_CTX.timeframe);
   }catch(e){ if(stamp) stamp.textContent='خطأ في تحديث السياق: '+e.message; }
@@ -326,7 +349,46 @@ function startLiveTicker(){
 }
 function stopLiveTicker(){ if(LIVE_TIMER){ clearInterval(LIVE_TIMER); LIVE_TIMER=null; } }
 
+/* ---------- backtest quality gate ---------- */
+function gateFromCandles(cs,symbol,tf){
+  const trades=backtest(cs), stats=stratStats(trades);
+  return {symbol,tf,pass:stats.trades>=STRAT.minTrades && stats.profit_factor>=STRAT.minPF,
+    trades:stats.trades,pf:stats.profit_factor,win_rate:stats.win_rate,max_dd:stats.max_dd,
+    total_r:stats.total_r,minTrades:STRAT.minTrades,minPF:STRAT.minPF,at:new Date().toISOString()};
+}
+async function ensureGate(){
+  const symbol=proEl('proSymbol')?.value||'XAUUSD', tf=proEl('proInterval')?.value||'H1';
+  const key=symbol+':'+tf;
+  if(GATE_CACHE.key===key && Date.now()-GATE_CACHE.at<10*60*1000) return GATE_CACHE.data;
+  let cs=(symbol==='XAUUSD' && PRO_CANDLES && PRO_CANDLES.length>=120 && PRO_CANDLES_TF===tf) ? PRO_CANDLES : null;
+  if(!cs){ try{ cs=(await loadHistory(symbol,tf)).candles; }catch(e){ cs=null; } }
+  if(!cs || cs.length<100){
+    return {symbol,tf,pass:false,trades:0,pf:0,error:'مفيش شموع كفاية للباكتيست',minPF:STRAT.minPF,minTrades:STRAT.minTrades};
+  }
+  const g=gateFromCandles(cs,symbol,tf);
+  GATE_CACHE={key,at:Date.now(),data:g};
+  return g;
+}
+function renderGate(g){
+  const box=proEl('ctxGate'); if(!box) return;
+  if(!g){ box.className='gate'; box.innerHTML=''; return; }
+  box.className='gate '+(g.pass?'ok':'bad');
+  box.innerHTML='<b>بوابة الباكتيست</b> · '+(g.pass?'مقبول ✅':'مرفوض ⛔')+
+    (g.error?(' · '+esc(g.error)):(' · PF '+esc(g.pf)+' · '+esc(g.trades)+' صفقة'))+
+    (g.pass?'':(' <i>المطلوب PF ≥ '+esc(g.minPF)+' و'+esc(g.minTrades)+' صفقة</i>'));
+}
+
 /* ---------- internet search panel ---------- */
+function newsAgeMin(p){
+  let s=String(p||'');
+  if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) s=s.replace(' ','T')+'Z';
+  const t=Date.parse(s);
+  return isFinite(t)?Math.max(0,Math.round((Date.now()-t)/60000)):null;
+}
+function ageHours(p){
+  const m=newsAgeMin(p);
+  return m===null?null:+(m/60).toFixed(1);
+}
 function ageLabel(iso){
   // rss2json / TradingView times arrive as ISO or "YYYY-MM-DD HH:MM:SS" in UTC.
   let s=String(iso||'');
@@ -371,7 +433,8 @@ async function ensureWebSearch(force){
   try{ web=await withTimeout(webResearch(PRO_CTX.instrument||'XAUUSD',!!force),15000,null); }catch(e){}
   if((!web || !web.results || !web.results.length) && window.WEB_SEARCH_CACHE) web=WEB_SEARCH_CACHE.data;
   if(web && web.results && web.results.length){
-    PRO_CTX.web_search={queried_at:web.queried_at, results:web.results.slice(0,8)};
+    PRO_CTX.web_search={queried_at:web.queried_at,
+      results:web.results.slice(0,8).map(r=>({...r,age_min:newsAgeMin(r.published)}))};
   }
   renderWebNews(PRO_CTX.web_search || web || null);
   return PRO_CTX.web_search || null;
@@ -399,6 +462,18 @@ async function proRecommend(){
   if(PRO_BUSY) return;
   const btn=proEl('recBtn'); if(btn) btn.disabled=true;
   err('');
+  // Quality gate first: no recommendation on a weak backtested setup.
+  const gate=await ensureGate();
+  renderGate(gate);
+  if(!gate.pass){
+    renderRec(null);
+    const out=proEl('recOut');
+    if(out) out.innerHTML='<div class="rec-block"><b>⛔ بوابة الباكتيست رفضت التوصية</b>'+
+      '<p class="tiny">'+(gate.error?esc(gate.error):('معامل الربح '+esc(gate.pf)+' · '+esc(gate.trades)+' صفقة'))+
+      ' — المطلوب PF ≥ '+esc(gate.minPF)+' و'+esc(gate.minTrades)+' صفقة على نفس الأداة/الفريم. جرّب فريم أو أداة تانية.</p></div>';
+    if(btn) btn.disabled=false;
+    return;
+  }
   const chosen=proActiveModels()[0];
   const all=proSortedModels();
   const models=(chosen?[chosen,...all.filter(p=>p!==chosen)]:all).slice(0,3);
@@ -553,6 +628,8 @@ async function proAutoAnalyze(){
   }
   const models=proActiveModels();
   if(!models.length) return null;
+  const gate=await ensureGate();
+  if(!gate.pass) return null;
   // Use a single model for auto (faster, less quota); manual button uses all.
   const p=models[0];
   const q='أعطني توصية عملية مبنية على السياق المرفق فقط. أرجع JSON فقط بالحقول: bias (BUY أو SELL أو WAIT)، entry، stop، targets (مصفوفة)، rr، conditions، risk. مفيش وعود ربح.';
@@ -640,6 +717,13 @@ function proInit(){
       prefs.symbol=proEl('proSymbol')?.value; prefs.interval=proEl('proInterval')?.value;
       prefs.model=proEl('proModel')?.value; proSavePrefs(prefs);
       localStorage.removeItem(proSignalKey(prefs.symbol||'XAUUSD',prefs.interval||'H1'));
+    });
+  });
+  // Changing instrument/timeframe must rebuild context and re-run the gate.
+  [proEl('proSymbol'),proEl('proInterval')].forEach(n=>{
+    if(n) n.addEventListener('change',()=>{
+      PRO_CANDLES=null; PRO_CANDLES_TF=null; GATE_CACHE={key:'',at:0,data:null}; PRO_CTX=null;
+      refreshContext();
     });
   });
   refreshContext();

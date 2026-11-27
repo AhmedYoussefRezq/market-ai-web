@@ -700,6 +700,7 @@ async function liveGoldSnapshot(interval='H1'){
     recent_candles:cs.slice(-16).map(c=>({t:new Date(c.t*1000).toISOString().slice(0,16).replace('T',' '),
       o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
     chart:cs.slice(-80).map(c=>({t:c.t,o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
+    candles:cs,
     macro, news:[], warnings
   };
 }
