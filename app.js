@@ -27,7 +27,6 @@ const INTERVALS = {
 };
 const TEMPLATES = [
   {name:'groq', base_url:'https://api.groq.com/openai/v1', model:'openai/gpt-oss-120b', api_key:'', enabled:true},
-  {name:'openrouter', base_url:'https://openrouter.ai/api/v1', model:'google/gemma-4-26b-a4b-it:free', api_key:'', enabled:true},
   {name:'gemini', base_url:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-3.5-flash-lite', api_key:'', enabled:true},
   {name:'mistral', base_url:'https://api.mistral.ai/v1', model:'mistral-small-latest', api_key:'', enabled:true},
   {name:'cerebras', base_url:'https://api.cerebras.ai/v1', model:'gpt-oss-120b', api_key:'', enabled:true},
@@ -36,15 +35,7 @@ const TEMPLATES = [
   {name:'custom', base_url:'', model:'', api_key:'', enabled:true}
 ];
 // One key from these providers can drive several models in parallel.
-// IDs checked against the live OpenRouter / Groq / Cerebras catalogs (Nov 2026).
 const FREE_MODEL_SETS = {
-  openrouter:{label:'OpenRouter', base:'https://openrouter.ai/api/v1', models:[
-    'baidu/ernie-5.5-flash-preview:free',
-    'liquid/lfm-3-1.7b:free','particle-ai/particle-1:free','recursive/flint-v1.0:free',
-    'nvidia/nemotron-3.5-super-vl:free','nvidia/nemotron-3.5-lightning:free',
-    'nvidia/nemotron-3-ultra-550b-a55b:free','nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-    'google/gemma-4-26b-a4b-it:free','google/gemma-4-31b-it:free'
-  ]},
   groq:{label:'Groq', base:'https://api.groq.com/openai/v1', models:[
     'openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3.8-27b','allam-2-7b'
   ]},
@@ -180,28 +171,6 @@ function addFreeModels(source){
   err(added ? `اتضافت ${added} نماذج مجانية من ${set.label} — كلهم هيحللوا بالتوازي.` : `كل نماذج ${set.label} موجودة بالفعل.`);
 }
 // One paste is enough: save the key and expand all free OpenRouter models.
-function quickSetup(){
-  try{
-    const box = el('quickKey');
-    const key = (box ? box.value : '').trim();
-    if(!key){ err('الصق المفتاح الأول من openrouter.ai/keys'); return; }
-    addTemplates();
-    const list = providers();
-    list.forEach(p=>{ if((p.base_url||'').startsWith('https://openrouter.ai/api/v1')) p.api_key=key; });
-    if(!list.some(p=>p.name.toLowerCase()==='openrouter')){
-      list.push({name:'openrouter',base_url:FREE_MODEL_SETS.openrouter.base,
-        model:'google/gemma-4-26b-a4b-it:free',api_key:key,enabled:true});
-    }
-    if(!saveProviders(list)) return;
-    if(!providers().some(p=>p.api_key===key)){
-      err('المفتاح ما اتحفظش. جرّب تاني أو افتح الموقع في تبويب عادي مش وضع خاص.'); return;
-    }
-    addFreeModels('openrouter');
-    const n = providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
-    if(box) box.value='';
-    err(`تم ✅ المفتاح اتحفظ واتضافت كل النماذج المجانية — ${n} نموذج جاهز. اضغط «شغّل التحليل بكل المفاتيح».`);
-  }catch(e){ err('حصل خطأ أثناء الحفظ: '+(e && e.message ? e.message : e)); }
-}
 function showSaveStatus(){
   const list = providers();
   const keys = new Set(list.filter(p=>p.api_key).map(p=>p.api_key)).size;

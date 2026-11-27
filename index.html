@@ -9,7 +9,7 @@
 <title>Market AI — صفقة مدروسة بكل النماذج</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 <header>
@@ -29,39 +29,12 @@
   <button class="ghost" onclick="toggleSettings()">إعداد مفاتيح AI</button>
 </div>
 
-<div class="card" id="strategyCard">
-  <h2>الاستراتيجية المختبرة (قواعد ثابتة)</h2>
-  <p class="note">مش AI: قواعد RSI + EMA + ATR، متجرّبة على 5 سنين بيانات حقيقية. ده الأساس — والـ AI تحت رأي إضافي بس.</p>
-  <label>الأداة<select id="stratSymbol"></select></label>
-  <label>فريم الاستراتيجية<select id="stratTf">
-    <option value="D1" selected>D1 — يومي (الأفضل)</option>
-    <option value="H4">H4 — 4 ساعات</option>
-    <option value="H1">H1 — ساعة</option>
-  </select></label>
-  <button id="stratBtn" onclick="runStrategy()">شغّل الاستراتيجية</button>
-  <p class="note" id="stratMsg"></p>
-  <div id="stratStats" class="chips"></div>
-  <div id="stratSignal"></div>
-  <h3>منحنى النتائج (R)</h3>
-  <div id="equityChart"></div>
-  <h3>آخر الصفقات</h3>
-  <div id="stratTrades"></div>
-  <h3>حاسبة حجم الصفقة</h3>
-  <label>رأس المال ($)<input id="acctSize" type="number" inputmode="decimal" min="1" value="1000"></label>
-  <label>نسبة المخاطرة %<input id="riskPct" type="number" inputmode="decimal" min="0.1" step="0.1" value="1"></label>
-  <button class="ghost" onclick="calcRisk()">احسب حجم الصفقة</button>
-  <div id="riskOut" class="note"></div>
-  <p class="note">النتائج تاريخية ومش ضمان. جرّب على حساب تجريبي الأول. المواصفات تقديرية — راجع بروكرك.</p>
-</div>
-
 <div class="card" id="quickCard">
-  <h2>أسهل طريقة — مفتاح واحد بس</h2>
-  <p class="note">١. افتح <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> وسجّل (مجاني).<br>٢. اضغط <b>Create Key</b> وانسخ المفتاح.<br>٣. الصقه هنا واضغط الزر — الموقع هيضيف ١١ موديلاً مجانياً لوحده.</p>
-  <label>الصق مفتاح OpenRouter هنا<input id="quickKey" type="password" dir="ltr" autocomplete="off" placeholder="sk-or-..."></label>
-  <button onclick="quickSetup()">حفظ المفتاح وتشغيل كل النماذج المجانية</button>
+  <h2>إعداد المفاتيح (مجاني)</h2>
+  <p class="note">استخدم Groq أو Gemini أو Mistral أو Cerebras أو Hugging Face. أضف مفتاحك من «إعداد مفاتيح AI» بالأسفل — لن يُحفظ على GitHub، بس في هذا المتصفح.</p>
+  <button class="ghost" onclick="toggleSettings()">فتح إعداد المفاتيح</button>
   <p class="note" id="quickMsg"></p>
   <button class="ghost" onclick="showSaveStatus()">اعرض حالة الحفظ</button>
-  <p class="note">المفتاح هيحفظ في <b>هذا المتصفح</b> بس — لو فتحت الموقع من متصفح أو جهاز تاني هتحتاج تدخله تاني. متلصقوش هنا في الشات ولا في GitHub.</p>
 </div>
 
 <div class="card" id="settings" style="display:none">
@@ -75,7 +48,6 @@
   <button onclick="saveProvider()">حفظ المزود</button>
   <button class="ghost" onclick="addTemplates()">أضف قوالب المزودين المجانيين</button>
   <h2>كل النماذج المجانية بمفتاح واحد</h2>
-  <button class="ghost" onclick="addFreeModels('openrouter')">أضف كل نماذج OpenRouter المجانية (10)</button>
   <button class="ghost" onclick="addFreeModels('groq')">أضف كل نماذج Groq المجانية (4)</button>
   <button class="ghost" onclick="addFreeModels('cerebras')">أضف كل نماذج Cerebras المجانية (2)</button>
   <button class="ghost" onclick="addFreeModels('gemini')">أضف كل نماذج Gemini (4)</button>
@@ -86,7 +58,7 @@
 
 <div class="card">
   <h2>رأي النماذج (اختياري)</h2>
-  <p class="note">ده رأي إضافي من الـ AI — مش أساس القرار. الأساس هو الاستراتيجية المختبرة فوق.</p>
+  <p class="note">تحليل AI فقط — بدون أوامر. النتائج ليست ضماناً.</p>
   <label>الأداة<select id="symbol"></select></label>
   <label>الفريم<select id="interval">
     <option>M15</option><option>M30</option><option selected>H1</option><option>H4</option><option>D1</option>
@@ -128,6 +100,6 @@
   <p class="note" id="stamp"></p>
 </div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

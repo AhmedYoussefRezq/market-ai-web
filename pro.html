@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f6f3ed">
+<meta name="theme-color" content="#131722">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Market AI Pro — مساعد التحليل</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="style.css?v=10">
-<link rel="stylesheet" href="pro.css?v=6">
+<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="pro.css?v=7">
 </head>
 <body class="pro">
 
@@ -96,14 +96,13 @@
     <p class="muted">مفتاح واحد يفعّل موديلات المزود. المفاتيح بتتخزن في هذا المتصفح فقط.</p>
 
     <div class="key-card primary">
-      <div class="key-title"><b>OpenRouter</b><a href="https://openrouter.ai/keys" target="_blank" rel="noopener">احصل على مفتاح <svg class="ico"><use href="#i-external"/></svg></a></div>
-      <input id="quickKey" type="password" dir="ltr" autocomplete="off" placeholder="sk-or-...">
-      <button onclick="proQuickProvider('openrouter')">حفظ وتفعيل 10 موديلات مجانية</button>
+      <div class="key-title"><b>Groq</b><a href="https://console.groq.com/keys" target="_blank" rel="noopener">احصل على مفتاح <svg class="ico"><use href="#i-external"/></svg></a></div>
+      <input id="groqKey" type="password" dir="ltr" autocomplete="off" placeholder="gsk_...">
+      <button onclick="proQuickProvider('groq')">حفظ وتفعيل 4 موديلات مجانية</button>
     </div>
 
     <details>
       <summary>مزودين أخرى</summary>
-      <div class="key-card"><div class="key-title"><b>Groq</b><a href="https://console.groq.com/keys" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="groqKey" type="password" dir="ltr" autocomplete="off" placeholder="gsk_..."><button class="secondary" onclick="proQuickProvider('groq')">تفعيل 4 موديلات</button></div>
       <div class="key-card"><div class="key-title"><b>Gemini</b><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">المفتاح <svg class="ico"><use href="#i-external"/></svg></a></div><input id="geminiKey" type="password" dir="ltr" autocomplete="off" placeholder="AIza..."><button class="secondary" onclick="proQuickProvider('gemini')">تفعيل 4 موديلات</button></div>
       <div class="key-card"><div class="key-title"><b>Hugging Face</b><a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">التوكن <svg class="ico"><use href="#i-external"/></svg></a></div><input id="hfKey" type="password" dir="ltr" autocomplete="off" placeholder="hf_..."><button class="secondary" onclick="proQuickProvider('huggingface')">تفعيل 4 موديلات</button></div>
       <div class="key-card"><div class="key-title"><b>Cerebras</b></div><input id="cerebrasKey" type="password" dir="ltr" autocomplete="off" placeholder="مفتاحك"><button class="secondary" onclick="proQuickProvider('cerebras')">تفعيل موديلين</button></div>
@@ -120,7 +119,7 @@
   </div>
 </div>
 
-<script src="app.js?v=11"></script>
-<script src="pro.js?v=8"></script>
+<script src="app.js?v=12"></script>
+<script src="pro.js?v=9"></script>
 </body>
 </html>

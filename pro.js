@@ -4,14 +4,14 @@
 const PRO_CHAT_KEY = 'market-ai-pro-chat-v1';
 const PRO_PREF_KEY = 'market-ai-pro-prefs-v1';
 const PRO_REC_KEY = 'market-ai-pro-rec-v1';
-const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد أبحاث تداول محترف. قواعدك الصارمة:
-1) استخدم فقط البيانات المرفقة في السياق (JSON). لا تخترع أسعاراً أو أخباراً أو أرقاماً أو تواريخ. لو معلومة غير موجودة قل «غير متوفرة في البيانات المرفقة».
-2) أجب بالعربية المصرية، باختصار ووضوح، بعناوين ونقاط قصيرة. لا وعود ربح، ولا توصية نهائية بالشراء أو البيع.
-3) فرّق صراحة بين: (أ) بيانات السوق الفعلية، (ب) قواعد استراتيجية مختبرة، (ج) رأي AI. اذكر أي واحد استخدمته في كل نقطة.
-4) دائماً اذكر المخاطرة، وأن البيانات التاريخية ليست ضماناً، وأن هذا التطبيق تحليل فقط لا يرسل أوامر ولا يدير أموالاً.
-5) لو طلب المستخدم تنفيذ صفقة أو نصيحة مالية شخصية، اعتذر بلطف وقل: التطبيق للتحليل فقط، وجرّب أي فكرة على حساب ديمو بنفسك.
-6) لا تقل «متأكد» أو «مضمون». استخدم صيغ تحفظ مثل: «البيانات المتاحة تشير إلى...».
-7) إذا كانت بيانات السوق قديمة أو بها تحذيرات، اذكر ذلك في بداية الرد.`;
+const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد تحليل سوق. قواعدك:
+1) استخدم فقط البيانات المرفقة (JSON). لا تخترع أسعاراً أو أخباراً أو أرقاماً.
+2) أجب بالعربية، مختصراً وواضحاً: 4-6 نقاط كحد أقصى، كل نقطة جملة واحدة.
+3) فرّق بين: (أ) بيانات السوق، (ب) رأي AI.
+4) لا وعود ربح، ولا توصية نهائية بالشراء/البيع. ذكّر بالمخاطرة.
+5) لو طلب تنفيذ صفقة، اعتذر: التطبيق للتحليل فقط.
+6) لا تقل «متأكد/مضمون». استخدم «البيانات تشير إلى...».
+7) إذا كانت البيانات قديمة/بها تحذيرات، اذكر ذلك أولاً.`;
 
 const PRO_PROMPTS = [
   'حلّل الأداة الحالية وأعطني توصية',
@@ -67,8 +67,7 @@ function proRenderChat(){
   const meAv='';
   if(!all.length){
     box.innerHTML='<div class="msg bot">'+aiAv+'<div class="bubble"><div class="who"><b>Market AI Pro</b></div>'+
-      '<div class="body">أهلاً! اسألني عن السوق أو اطلب تحليل أداة معينة. أنا بشوف بيانات السوق والباكتيست المرفقة قبل ما أجاوب — '+
-      'ومش باخترع أرقام. التطبيق ده <b>تحليل بس</b> ومش بيفتح أوامر.'+
+      '<div class="body">أهلاً! اسألني عن السوق — أحلل بيانات السوق وأجيبك بوضوح. <b>تحليل بس</b>، بدون أوامر.'+
       '<div class="foot"><button onclick="proConnect()"><svg class="ico"><use href="#i-key"/></svg> اربط AI مجاني</button></div></div></div></div>';
   }else{
     box.innerHTML=all.map(m=>{
@@ -109,11 +108,10 @@ function toggleProSettings(evt){
 function proConnect(){
   const ov=proEl('settingsOverlay');
   if(ov){ ov.style.display='flex'; document.body.classList.add('modal-open'); }
-  const k=proEl('quickKey'); if(k) setTimeout(()=>k.focus(),250);
+  const k=proEl('groqKey'); if(k) setTimeout(()=>k.focus(),250);
   err('الصق مفتاح AI مجاني واضغط الزر — المفاتيح بتتخزن في متصفحك بس.');
 }
 function proQuickProvider(source){
-  if(source==='openrouter'){ quickSetup(); proFillModels(); return; }
   const ids={groq:'groqKey',cerebras:'cerebrasKey',gemini:'geminiKey',
     huggingface:'hfKey',mistral:'mistralKey'}, set=FREE_MODEL_SETS[source];
   if(!set) return;
@@ -139,8 +137,7 @@ function proUseLocalBridge(){
   err('اتضاف موديل Groq المحلي. لو الجسر شغال (`python scripts/local_ai_bridge.py`) اسأل دلوقتي — المفتاح مش موجود في المتصفح.');
 }
 function proKeyAction(action){
-  if(action==='quick') quickSetup();
-  else if(action==='templates') addTemplates();
+  if(action==='templates') addTemplates();
   else if(action==='groq') addFreeModels('groq');
   else if(action==='cerebras') addFreeModels('cerebras');
   else if(action==='status') showSaveStatus();
@@ -225,17 +222,7 @@ async function buildProContext(){
     ctx.market={price:livePrice,error:'مفيش بيانات سوق متاحة دلوقتي — الموديل هيجاوب بدون أرقام سوق.'};
   }
 
-  const stratTf=['D1','H4','H1'].includes(interval)?interval:'D1';
-  try{
-    const h=await loadHistory(symbol,stratTf);
-    const st=stratStats(backtest(h.candles));
-    const sig=stratSignal(h.candles);
-    ctx.rule_strategy={symbol,timeframe:stratTf,bars:h.candles.length,source:h.source,
-      result:{trades:st.trades,win_rate:st.win_rate,profit_factor:st.profit_factor,
-        total_r:st.total_r,max_dd:st.max_dd,avg_r:st.avg_r},
-      current_signal:sig?{bias:sig.bias,rsi:sig.rsi,trend:sig.trend,entry:sig.entry,sl:sig.sl,tp:sig.tp}:null,
-      note:'قواعد RSI50 + EMA20/50 + ATR — هامش رفيع، مش ضمان'};
-  }catch(e){ ctx.rule_strategy={error:String(e.message||e)}; }
+  // Strategy/backtest intentionally omitted (user request): analysis only, no tested-strategy injection.
 
   return ctx;
 }
@@ -255,9 +242,9 @@ function drawCtxChart(symbol,tf){
     const w=300,hgt=70,pad=4;
     const line=a=>a.map((v,i)=>((pad+i*(w-2*pad)/(a.length-1)).toFixed(1)+','+(pad+(max-v)*(hgt-2*pad)/span).toFixed(1))).join(' ');
     box.innerHTML='<svg viewBox="0 0 '+w+' '+hgt+'" preserveAspectRatio="none">'+
-      '<polyline points="'+line(cl)+'" fill="none" stroke="#ef6c20" stroke-width="1.6"/>'+
-      '<polyline points="'+line(e20)+'" fill="none" stroke="#2f9b6c" stroke-width="1" opacity=".8"/>'+
-      '<polyline points="'+line(e50)+'" fill="none" stroke="#9aa0a7" stroke-width="1" opacity=".8"/>'+
+      '<polyline points="'+line(cl)+'" fill="none" stroke="#2962ff" stroke-width="1.6"/>'+
+      '<polyline points="'+line(e20)+'" fill="none" stroke="#089981" stroke-width="1" opacity=".8"/>'+
+      '<polyline points="'+line(e50)+'" fill="none" stroke="#787b86" stroke-width="1" opacity=".8"/>'+
       '</svg>';
   }).catch(()=>{ box.innerHTML=''; });
 }
@@ -377,7 +364,7 @@ async function proSend(preset){
     const stamp=proEl('ctxStamp'); if(stamp) stamp.textContent='بحدّث بيانات السوق قبل الرد...';
     try{ PRO_CTX=await buildProContext(); PRO_CTX_AT=Date.now(); refreshContext(); }catch(e){}
   }
-  const hist=proChat().slice(-8,-1).map(m=>({role:m.role==='user'?'user':'assistant',content:String(m.text||'').slice(0,1200)}));
+  const hist=proChat().slice(-5,-1).map(m=>({role:m.role==='user'?'user':'assistant',content:String(m.text||'').slice(0,700)}));
   const messages=[{role:'system',content:PRO_SYSTEM},...hist,
     {role:'user',content:JSON.stringify({question:text,context:PRO_CTX})}];
 
