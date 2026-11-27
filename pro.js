@@ -95,7 +95,7 @@ function clearChat(){
 }
 function exportChat(){
   const all=proChat(); if(!all.length){ err('مفيش محادثة لتصديرها.'); return; }
-  const txt=all.map(m=>`[${m.at}] ${m.role==='user'?'أنت':(m.meta.model||'AI')}\n${m.text}\n`).join('\n---\n');
+  const txt=all.map(m=>`[${m.at}] ${m.role==='user'?'أنت':((m.meta||{}).model||'AI')}\n${m.text}\n`).join('\n---\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));
   a.download='market-ai-pro-chat.txt'; a.click(); URL.revokeObjectURL(a.href);
 }
@@ -105,11 +105,6 @@ function toggleProSettings(evt){
   const show=ov.style.display!=='flex';
   ov.style.display=show?'flex':'none';
   document.body.classList.toggle('modal-open',show);
-}
-function toggleSidebar(){
-  const rail=proEl('rail'), back=proEl('railBackdrop'); if(!rail) return;
-  const open=rail.classList.toggle('open');
-  if(back) back.classList.toggle('show',open);
 }
 function proConnect(){
   const ov=proEl('settingsOverlay');
@@ -164,15 +159,20 @@ function markProviderFail(p,minutes){
   try{ localStorage.setItem(proFailKey(p),String(Date.now()+(minutes||10)*60000)); }catch(e){}
 }
 function markProviderOK(p){ try{ localStorage.removeItem(proFailKey(p)); }catch(e){} }
-function proActiveModels(){
+function proEnabledModels(){ return providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model); }
+function proSortedModels(){
   const now=Date.now();
-  const all=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model)
-    .sort((a,b)=>{
-      const ta=Number(localStorage.getItem(proFailKey(a))||0), tb=Number(localStorage.getItem(proFailKey(b))||0);
-      return (ta>now?1:0)-(tb>now?1:0);
-    });
-  const sel=proEl('proModel');
-  if(proEl('proHarmony')?.checked) return all.slice(0,4);
+  return proEnabledModels().slice().sort((a,b)=>{
+    let ta=0,tb=0;
+    try{ ta=Number(localStorage.getItem(proFailKey(a))||0); tb=Number(localStorage.getItem(proFailKey(b))||0); }catch(e){}
+    return (ta>now?1:0)-(tb>now?1:0);
+  });
+}
+function proActiveModels(){
+  // The dropdown is built from the stored order — keep that index intact.
+  // Failure-based reordering applies only to harmony and to failover fallbacks.
+  const all=proEnabledModels(), sel=proEl('proModel');
+  if(proEl('proHarmony')?.checked) return proSortedModels().slice(0,4);
   const i=sel?Number(sel.value||0):0;
   return all[i]?[all[i]]:(all[0]?[all[0]]:[]);
 }
@@ -255,9 +255,9 @@ function drawCtxChart(symbol,tf){
     const w=300,hgt=70,pad=4;
     const line=a=>a.map((v,i)=>((pad+i*(w-2*pad)/(a.length-1)).toFixed(1)+','+(pad+(max-v)*(hgt-2*pad)/span).toFixed(1))).join(' ');
     box.innerHTML='<svg viewBox="0 0 '+w+' '+hgt+'" preserveAspectRatio="none">'+
-      '<polyline points="'+line(cl)+'" fill="none" stroke="#2dd4bf" stroke-width="1.6"/>'+
-      '<polyline points="'+line(e20)+'" fill="none" stroke="#f0b64a" stroke-width="1" opacity=".8"/>'+
-      '<polyline points="'+line(e50)+'" fill="none" stroke="#5aa9ff" stroke-width="1" opacity=".6"/>'+
+      '<polyline points="'+line(cl)+'" fill="none" stroke="#ef6c20" stroke-width="1.6"/>'+
+      '<polyline points="'+line(e20)+'" fill="none" stroke="#2f9b6c" stroke-width="1" opacity=".8"/>'+
+      '<polyline points="'+line(e50)+'" fill="none" stroke="#9aa0a7" stroke-width="1" opacity=".8"/>'+
       '</svg>';
   }).catch(()=>{ box.innerHTML=''; });
 }
@@ -273,12 +273,6 @@ async function refreshContext(){
     const ind=proEl('ctxInd');
     if(ind) ind.innerHTML=renderIndicators(m).replace(/undefined/g,'-');
     drawCtxChart(PRO_CTX.instrument,PRO_CTX.timeframe);
-    const rs=PRO_CTX.rule_strategy||{};
-    const s=proEl('ctxStrat');
-    if(s) s.innerHTML=rs.error?esc(rs.error):
-      `${esc(rs.symbol)} · ${esc(rs.timeframe)} · ${rs.bars} شمعة · ${rs.result.trades} صفقة · PF <b>${esc(rs.result.profit_factor)}</b> · DD ${esc(rs.result.max_dd)}R<br>الإشارة: <b>${esc(rs.current_signal?.bias||'WAIT')}</b>`;
-    const w=proEl('ctxWarnings');
-    if(w) w.textContent=(m.warnings||[]).length?'تحذيرات البيانات: '+m.warnings.join(' · '):'';
   }catch(e){ if(stamp) stamp.textContent='خطأ في تحديث السياق: '+e.message; }
   finally{ if(btn) btn.disabled=false; }
 }
@@ -290,7 +284,7 @@ function proLoadRec(){
 function proSaveRec(r){ try{ localStorage.setItem(PRO_REC_KEY,JSON.stringify(r)); }catch(e){} }
 function renderRec(r){
   const out=proEl('recOut'); if(!out) return;
-  if(!r){ out.innerHTML='<p class="note tiny">اضغط «أنشئ توصية» عشان الموديل يطلع دخول ووقف وهدف من البيانات الحالية.</p>'; return; }
+  if(!r){ out.innerHTML='<p class="muted tiny">اضغط «توليد» عشان الموديل يطلع دخول ووقف وهدف من البيانات الحالية.</p>'; return; }
   const dir=String(r.bias||'WAIT').toUpperCase();
   const cls=['BUY','SELL','WAIT'].includes(dir)?dir.toLowerCase():'wait';
   const targets=Array.isArray(r.targets)?r.targets.join(' / '):fmt(r.targets);
@@ -306,7 +300,7 @@ async function proRecommend(){
   const btn=proEl('recBtn'); if(btn) btn.disabled=true;
   err('');
   const chosen=proActiveModels()[0];
-  const all=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model);
+  const all=proSortedModels();
   const models=(chosen?[chosen,...all.filter(p=>p!==chosen)]:all).slice(0,3);
   if(!models.length){ proConnect(); if(btn) btn.disabled=false; return; }
   if(!PRO_CTX||Date.now()-PRO_CTX_AT>10*60*1000){
@@ -318,6 +312,7 @@ async function proRecommend(){
   let rec=null;
   for(const p of models.slice(0,3)){
     const r=await proCallChat(p,messages,null);
+    if(r.ok) markProviderOK(p); else markProviderFail(p);
     if(r.ok){ const o=parseJSON(r.text); if(o&&o.bias){ rec=o; rec._model=p.name; break; } }
   }
   if(rec){ proSaveRec(rec); renderRec(rec); err('اتعملت توصية جديدة من '+rec._model+'.'); }
@@ -405,9 +400,8 @@ async function proSend(preset){
         proUpdate(ids[k],final,{model:p.name,ms:r.ms,at:proTime()});
       })));
     }else{
-      const all=providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model);
       const p=models[0], id=ids[0];
-      const fallbacks=all.filter(x=>x.base_url!==p.base_url||x.model!==p.model).slice(0,3);
+      const fallbacks=proSortedModels().filter(x=>x.base_url!==p.base_url||x.model!==p.model).slice(0,3);
       let r=await proCallChat(p,messages,partial=>proUpdate(id,partial,{model:p.name,at:proTime()}));
       if(!r.ok) markProviderFail(p); else markProviderOK(p);
       let used=p, tries=0;
@@ -437,7 +431,16 @@ function proNotify(sym,tf,sig){
   if(toast){ toast.textContent='تنبيه صفقة: '+body; toast.style.display='block';
     setTimeout(()=>{ toast.style.display='none'; },14000); }
   if('Notification' in window && Notification.permission==='granted'){
-    try{ new Notification('Market AI Pro — صفقة محتملة',{body,icon:'icon-192.png',tag:'market-ai-signal'}); }catch(e){}
+    const title='Market AI Pro — صفقة محتملة';
+    const opts={body,icon:'icon-192.png',tag:'market-ai-signal',data:{url:'./pro.html'}};
+    // Chrome on Android blocks `new Notification()` — go through the service worker first.
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.ready
+        .then(reg=>reg.showNotification(title,opts))
+        .catch(()=>{ try{ new Notification(title,opts); }catch(e){} });
+    }else{
+      try{ new Notification(title,opts); }catch(e){}
+    }
   }
 }
 async function proAutoAnalyze(){
@@ -466,7 +469,11 @@ async function registerPeriodic(mins){
   if(!('serviceWorker' in navigator)) return;
   try{
     const reg=await navigator.serviceWorker.ready;
-    if(reg.periodicSync?.register) await reg.periodicSync.register('market-ai-check',{minInterval:mins*60*1000});
+    if(!reg.periodicSync?.register) return;
+    try{ await reg.periodicSync.register('market-ai-check',{minInterval:mins*60*1000}); }
+    catch(e){ // Android Chrome may enforce a longer minimum — retry with 12h.
+      await reg.periodicSync.register('market-ai-check',{minInterval:12*60*60*1000}).catch(()=>{});
+    }
   }catch(e){}
 }
 async function toggleAuto(){
@@ -490,7 +497,6 @@ function proInit(){
     sel.value=(proPrefs().symbol)||'XAUUSD';
   }
   const iv=proEl('proInterval'); if(iv) iv.value=(proPrefs().interval)||'H1';
-  const cons=proEl('proConsensus'); if(cons) cons.checked=!!proPrefs().consensus;
   proFillModels();
   const q=proEl('quickPrompts');
   if(q) q.innerHTML=PRO_PROMPTS.map(x=>'<button onclick="proSend(this.querySelector(\'span\').textContent)">'+

@@ -58,7 +58,9 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .switch .track::after{content:"";position:absolute;top:2px;inset-inline-start:2px;width:11px;height:11px;
   border-radius:50%;background:#a7aab0;transition:.2s}
 .switch input:checked + .track{background:var(--orange);border-color:var(--orange)}
-.switch input:checked + .track::after{transform:translateX(13px);background:#fff}
+/* RTL: knob starts at inline-start (right), so it slides left when checked. */
+.switch input:checked + .track::after{transform:translateX(-13px);background:#fff}
+.note{color:var(--muted)}
 .auto-toast{position:fixed;z-index:60;top:70px;inset-inline-start:50%;transform:translateX(-50%);
   max-width:min(520px,92vw);background:var(--paper);border:1px solid var(--orange);border-radius:12px;
   padding:11px 14px;font-size:12px;font-weight:700;box-shadow:0 12px 32px rgba(60,45,25,.18);
