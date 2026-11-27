@@ -39,7 +39,7 @@ const TEMPLATES = [
 // IDs checked against the live OpenRouter / Groq / Cerebras catalogs (Nov 2026).
 const FREE_MODEL_SETS = {
   openrouter:{label:'OpenRouter', base:'https://openrouter.ai/api/v1', models:[
-    'inclusionai/ling-3.2-flash:free','baidu/ernie-5.5-flash-preview:free',
+    'baidu/ernie-5.5-flash-preview:free',
     'liquid/lfm-3-1.7b:free','particle-ai/particle-1:free','recursive/flint-v1.0:free',
     'nvidia/nemotron-3.5-super-vl:free','nvidia/nemotron-3.5-lightning:free',
     'nvidia/nemotron-3-ultra-550b-a55b:free','nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
