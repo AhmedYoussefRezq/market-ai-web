@@ -14,7 +14,7 @@ const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد أبحاث تداول 
 
 const PRO_PROMPTS = [
   'حلّل الأداة الحالية دلوقتي: الاتجاه، الزخم، وأهم مستويات الدعم والمقاومة.',
-  'إيه رأيك في إشارة الاستراتيجية المختبرة؟ وليه البوت ما بيدخلش في نص الحركة؟',
+  'إيه رأيك في إشارة الاستراتيجية المختبرة؟ وليه ما ندخلش في نص الحركة؟',
   'احسب لي حجم اللوت لو رأس المال 1000$ ونسبة المخاطرة 1%.',
   'لخّص الأخبار المرفقة وتأثيرها المحتمل على الأداة.',
   'اشرح الفرق بين الزخم اللحظي والارتداد على M15، وليه M15 أفضل هنا.',
@@ -229,11 +229,6 @@ async function buildProContext(){
       note:'قواعد RSI50 + EMA20/50 + ATR — هامش رفيع، مش ضمان'};
   }catch(e){ ctx.rule_strategy={error:String(e.message||e)}; }
 
-  ctx.demo_bot_reference={
-    symbol:'XAUUSDm',timeframe:'M15',mode:'EMA20/50 + RSI45/55 + EMA9 pullback',
-    broker_backtest:{trades:130,win_rate:43.8,profit_factor:1.19,total_r:12.9,max_dd:6.0},
-    note:'من بيانات MT5 بعد خصم السبريد — بوت ديمو فقط، لسه مفيش نتائج حية كافية'
-  };
   return ctx;
 }
 async function refreshContext(){
@@ -251,8 +246,6 @@ async function refreshContext(){
     const s=proEl('ctxStrat');
     if(s) s.innerHTML=rs.error?esc(rs.error):
       `${esc(rs.symbol)} · ${esc(rs.timeframe)} · ${rs.bars} شمعة · ${rs.result.trades} صفقة · PF <b>${esc(rs.result.profit_factor)}</b> · DD ${esc(rs.result.max_dd)}R<br>الإشارة: <b>${esc(rs.current_signal?.bias||'WAIT')}</b>`;
-    const b=proEl('ctxBot');
-    if(b) b.innerHTML='XAUUSDm / M15 · 130 صفقة · PF <b>1.19</b> · DD 6R<br><span class="tiny">باكتيست بروكري، ديمو فقط — مش نتائج حية</span>';
     const w=proEl('ctxWarnings');
     if(w) w.textContent=(m.warnings||[]).length?'تحذيرات البيانات: '+m.warnings.join(' · '):'';
   }catch(e){ if(stamp) stamp.textContent='خطأ في تحديث السياق: '+e.message; }
