@@ -561,7 +561,7 @@ async function marketSnapshot(symbol, interval){
     macro, news:merged, warnings};
   if(st){
     // Never replace a full dataset with a 1-candle live fallback.
-    if(cs.length<30){ snap.indicators=st.indicators; snap.recent_candles=st.recent_candles; snap.generated_at=st.generated_at; warnings.push('بيانات من النسخة الاحتياطية على GitHub'); }
+    if(cs.length<30){ snap.indicators=st.indicators; snap.recent_candles=st.recent_candles; snap.generated_at=st.generated_at; warnings.push('استخدمت نسخة احتياطية — بيانات محدودة'); }
     if(!snap.news.length) snap.news=st.news;
     if(snap.macro.length<2) snap.macro=st.macro;
   }

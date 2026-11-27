@@ -206,8 +206,8 @@ async function buildProContext(){
   if(snap&&((snap.indicators||{}).last||livePrice!==null)){
     const i=snap.indicators||{}, warnings=[...(snap.warnings||[])];
     const age=snap.generated_at&&isFinite(Date.parse(snap.generated_at))?Date.now()-Date.parse(snap.generated_at):Infinity;
-    if(age>6*3600*1000) warnings.push('النسخة المحفوظة على GitHub قديمة — الأرقام تقريبية');
-    if(livePrice!==null) warnings.push('سعر لحظي من مصدر عام: '+livePrice);
+    if(age>24*3600*1000) warnings.push('بيانات المؤشرات من نسخة GitHub (قد تكون قديمة) — استخدم السعر اللحظي.');
+    if(livePrice!==null) warnings.push('سعر لحظي: '+livePrice);
     ctx.market={label:snap.label||SYMBOLS[symbol]?.label,source_snapshot:snap.generated_at,
       price:livePrice!==null?livePrice:i.last,last:livePrice!==null?livePrice:i.last,
       snapshot_price:i.last,change_pct:i.change_pct,
