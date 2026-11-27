@@ -210,7 +210,7 @@ async function fetchMacro(){
 }
 async function staticSnapshot(symbol, interval){
   try{
-    const d=await getJSON('/data/market.json',15000);
+    const d=await getJSON('data/market.json',15000);
     const s=(d.symbols||{})[symbol];
     if(!s) return null;
     return {symbol,label:SYMBOLS[symbol].label,interval:s.interval||interval,generated_at:d.generated_at,
@@ -364,6 +364,6 @@ function init(){
   const sel=el('symbol');
   sel.innerHTML=Object.entries(SYMBOLS).map(([k,v])=>`<option value="${k}">${esc(v.label)} (${esc(v.kind)})</option>`).join('');
   sel.value='XAUUSD'; renderProviders();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 init();
