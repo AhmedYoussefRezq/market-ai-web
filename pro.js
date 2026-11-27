@@ -1,7 +1,7 @@
 /* Market AI Pro — chat-first trading analyst.
    Static app: free public data + keys kept in this browser. ANALYSIS ONLY. */
 
-const PRO_CHAT_KEY = 'market-ai-pro-chat-v1';
+const PRO_CHAT_KEY = 'market-ai-pro-chat-v2';
 const PRO_PREF_KEY = 'market-ai-pro-prefs-v1';
 const PRO_REC_KEY = 'market-ai-pro-rec-v1';
 const PRO_SYSTEM = `أنت «Market AI Pro»، مساعد تحليل سوق. قواعدك:

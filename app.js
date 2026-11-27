@@ -687,6 +687,8 @@ async function analyze(){
   finally{ el('loading').style.display='none'; el('runBtn').disabled=false; el('runBtn').textContent='اسأل النماذج (اختياري)'; }
 }
 function init(){
+  // Remove any previously saved OpenRouter providers (feature cancelled by user).
+  try{ const cleaned=providers().filter(p=>!String(p.base_url||'').includes('openrouter.ai')); if(cleaned.length!==providers().length) saveProviders(cleaned); }catch(e){}
   const options=Object.entries(SYMBOLS).map(([k,v])=>`<option value="${k}">${esc(v.label)} (${esc(v.kind)})</option>`).join('');
   const sel=el('symbol'); if(sel){ sel.innerHTML=options; sel.value='XAUUSD'; }
   const ssel=el('stratSymbol'); if(ssel){ ssel.innerHTML=options; ssel.value='XAUUSD'; }
