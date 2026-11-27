@@ -70,7 +70,11 @@ Return ONLY one valid JSON object:
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmt(v){ return (v===null||v===undefined||v==='')?'-':String(v); }
 function el(id){ return document.getElementById(id); }
-function err(msg){ el('err').textContent = msg || ''; }
+function err(msg){
+  const n=el('err'); if(n) n.textContent = msg || '';
+  const q=el('quickMsg'); if(q) q.textContent = msg || '';
+  if(!n && !q) console.warn(msg);
+}
 
 async function getJSON(url, ms=20000){
   const ctl = new AbortController();
@@ -114,7 +118,10 @@ async function fetchViaProxies(url, kind='json', ms=10000){
 function providers(){
   try{ return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }catch(e){ return []; }
 }
-function saveProviders(list){ localStorage.setItem(LS_KEY, JSON.stringify(list)); }
+function saveProviders(list){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(list)); return true; }
+  catch(e){ err('مش قادر أحفظ في المتصفح: '+(e && e.message ? e.message : e)+'. جرّب تبويب عادي مش وضع خاص، وامسح بيانات الموقع لو ممتلئة.'); return false; }
+}
 function cacheGet(key){
   try{ const c = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); const hit = c[key]; if(hit && Date.now()-hit.t < 15*60*1000) return hit.v; }catch(e){}
   return null;
@@ -161,20 +168,32 @@ function addFreeModels(source){
 }
 // One paste is enough: save the key and expand all free OpenRouter models.
 function quickSetup(){
-  const key = el('quickKey').value.trim();
-  if(!key){ err('الصق المفتاح الأول من openrouter.ai/keys'); return; }
-  addTemplates();
+  try{
+    const box = el('quickKey');
+    const key = (box ? box.value : '').trim();
+    if(!key){ err('الصق المفتاح الأول من openrouter.ai/keys'); return; }
+    addTemplates();
+    const list = providers();
+    list.forEach(p=>{ if((p.base_url||'').startsWith('https://openrouter.ai/api/v1')) p.api_key=key; });
+    if(!list.some(p=>p.name.toLowerCase()==='openrouter')){
+      list.push({name:'openrouter',base_url:FREE_MODEL_SETS.openrouter.base,
+        model:'google/gemma-4-26b-a4b-it:free',api_key:key,enabled:true});
+    }
+    if(!saveProviders(list)) return;
+    if(!providers().some(p=>p.api_key===key)){
+      err('المفتاح ما اتحفظش. جرّب تاني أو افتح الموقع في تبويب عادي مش وضع خاص.'); return;
+    }
+    addFreeModels('openrouter');
+    const n = providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
+    if(box) box.value='';
+    err(`تم ✅ المفتاح اتحفظ واتضافت كل النماذج المجانية — ${n} نموذج جاهز. اضغط «شغّل التحليل بكل المفاتيح».`);
+  }catch(e){ err('حصل خطأ أثناء الحفظ: '+(e && e.message ? e.message : e)); }
+}
+function showSaveStatus(){
   const list = providers();
-  list.forEach(p=>{ if((p.base_url||'').startsWith('https://openrouter.ai/api/v1')) p.api_key=key; });
-  if(!list.some(p=>p.name.toLowerCase()==='openrouter')){
-    list.push({name:'openrouter',base_url:FREE_MODEL_SETS.openrouter.base,
-      model:'google/gemma-4-26b-a4b-it:free',api_key:key,enabled:true});
-  }
-  saveProviders(list);
-  addFreeModels('openrouter');
-  el('quickKey').value='';
-  const n = providers().filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
-  err(`تم ✅ المفتاح اتحفظ واتضافت كل النماذج المجانية — ${n} نموذج جاهز. اضغط «شغّل التحليل بكل المفاتيح».`);
+  const keys = new Set(list.filter(p=>p.api_key).map(p=>p.api_key)).size;
+  const models = list.filter(p=>p.api_key&&p.enabled&&p.base_url&&p.model).length;
+  err(keys ? `الحفظ شغال ✅ ${keys} مفتاح / ${models} نموذج محفوظين في هذا المتصفح.` : 'لسه مفيش مفتاح محفوظ في هذا المتصفح.');
 }
 function saveProvider(){
   const name = el('pName').value.trim();
