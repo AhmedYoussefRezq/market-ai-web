@@ -47,8 +47,11 @@
     <option value="H1" selected>H1</option><option value="H4">H4</option><option value="D1">D1</option>
   </select></label>
   <label>الموديل<select id="proModel"></select></label>
+  <label class="switch"><input type="checkbox" id="proHarmony"><span class="track"></span><span>تناغم</span></label>
+  <label class="switch"><input type="checkbox" id="proAuto" onchange="toggleAuto()"><span class="track"></span><span>تلقائي</span></label>
   <button class="icon-btn" id="ctxBtn" onclick="refreshContext()" title="تحديث البيانات"><svg class="ico"><use href="#i-refresh"/></svg></button>
 </div>
+<div id="autoToast" class="auto-toast" style="display:none"></div>
 
 <div class="workspace">
   <aside class="rail">
@@ -118,6 +121,6 @@
 </div>
 
 <script src="app.js?v=11"></script>
-<script src="pro.js?v=6"></script>
+<script src="pro.js?v=7"></script>
 </body>
 </html>

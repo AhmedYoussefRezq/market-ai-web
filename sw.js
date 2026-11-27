@@ -1,4 +1,4 @@
-const CACHE = 'market-ai-web-v6';
+const CACHE = 'market-ai-web-v7';
 // Relative to the service worker scope so it works on GitHub project Pages (/repo/).
 const ASSETS = ['./', './index.html', './pro.html', './style.css', './pro.css', './app.js',
   './pro.js', './manifest.webmanifest', './icon-192.png', './icon-512.png',
@@ -11,6 +11,41 @@ self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
     .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
+});
+
+// Periodic background check (Android Chrome PWA; silently ignored where unsupported).
+self.addEventListener('periodicsync', event => {
+  if (event.tag !== 'market-ai-check') return;
+  event.waitUntil((async () => {
+    try {
+      const r = await fetch('./data/history/XAUUSD.json', { cache: 'no-store' });
+      const d = await r.json();
+      const cl = (d.D1 || []).map(x => Number(x[4])).filter(x => isFinite(x));
+      if (cl.length < 60) return;
+      const ema = a => { const k = 2/21; let e = a[0]; for (let i=1;i<a.length;i++) e = a[i]*k + e*(1-k); return e; };
+      let g = 0, l = 0;
+      for (let i = cl.length-14; i < cl.length; i++) { const diff = cl[i]-cl[i-1]; g += Math.max(diff,0); l += Math.max(-diff,0); }
+      const rsi = l === 0 ? 100 : 100 - 100/(1+(g/14)/(l/14));
+      const e20 = ema(cl.slice(-40)), e50 = ema(cl);
+      const bias = rsi > 52 && e20 > e50 ? 'BUY' : rsi < 48 && e20 < e50 ? 'SELL' : 'WAIT';
+      if (bias === 'WAIT') return;
+      const cache = await caches.open('market-ai-signals-v1');
+      const old = await cache.match('signal').then(x => x && x.text()).catch(() => null);
+      if (old === bias) return;
+      await cache.put('signal', new Response(bias));
+      await self.registration.showNotification('Market AI Pro — صفقة محتملة', {
+        body: 'XAUUSD / D1 · ' + bias,
+        icon: 'icon-192.png', tag: 'market-ai-signal', data: { url: './pro.html' }
+      });
+    } catch (e) {}
+  })());
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
+    const found = list.find(c => c.url.includes('pro.html'));
+    return found ? found.focus() : self.clients.openWindow('./pro.html');
+  }));
 });
 
 // Network-first for every same-origin GET: fresh files/data when online, cached copy offline.
