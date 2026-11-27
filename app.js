@@ -74,7 +74,7 @@ const PROXIES = [
   u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
   u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u)
 ];
-async function fetchViaProxies(url, kind='json', ms=18000){
+async function fetchViaProxies(url, kind='json', ms=10000){
   const errors=[];
   for(const make of PROXIES){
     try{
@@ -154,21 +154,24 @@ async function fetchCandles(symbol, interval){
   const hit = cacheGet(cacheKey); if(hit) return hit;
   const [yi, range, factor] = INTERVALS[interval] || INTERVALS.H1;
   let candles = [];
-  try{
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(SYMBOLS[symbol].yahoo)}?range=${range}&interval=${yi}&includePrePost=false`;
-    const data = await fetchViaProxies(url, 'json', 20000);
-    const res = ((data.chart||{}).result||[])[0];
-    if(res && res.timestamp){
-      const q = ((res.indicators||{}).quote||[])[0] || {};
-      const closes=q.close||[], opens=q.open||[], highs=q.high||[], lows=q.low||[], vols=q.volume||[];
-      res.timestamp.forEach((ts,i)=>{
-        const c = Number(closes[i]); if(!isFinite(c)) return;
-        candles.push({t:ts,o:Number(opens[i]??c),h:Number(highs[i]??Math.max(Number(opens[i]??c),c)),
-          l:Number(lows[i]??Math.min(Number(opens[i]??c),c)),c,v:Number(vols[i]||0)});
-      });
-      candles = resample(candles, factor);
-    }
-  }catch(e){ /* fallback below */ }
+  for(const host of ['query1','query2']){
+    try{
+      const url = `https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(SYMBOLS[symbol].yahoo)}?range=${range}&interval=${yi}&includePrePost=false`;
+      const data = await fetchViaProxies(url, 'json', 12000);
+      const res = ((data.chart||{}).result||[])[0];
+      if(res && res.timestamp){
+        const q = ((res.indicators||{}).quote||[])[0] || {};
+        const closes=q.close||[], opens=q.open||[], highs=q.high||[], lows=q.low||[], vols=q.volume||[];
+        res.timestamp.forEach((ts,i)=>{
+          const c = Number(closes[i]); if(!isFinite(c)) return;
+          candles.push({t:ts,o:Number(opens[i]??c),h:Number(highs[i]??Math.max(Number(opens[i]??c),c)),
+            l:Number(lows[i]??Math.min(Number(opens[i]??c),c)),c,v:Number(vols[i]||0)});
+        });
+        candles = resample(candles, factor);
+      }
+    }catch(e){ /* try next host / fallback below */ }
+    if(candles.length) break;
+  }
   if(!candles.length){
     try{
       if(symbol==='BTCUSD'||symbol==='ETHUSD'){
@@ -212,12 +215,12 @@ async function fetchNews(query, limit){
   let items=[];
   try{
     const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-    const d = await getJSON('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(rss),20000);
+    const d = await getJSON('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(rss),10000);
     items=(d.items||[]).slice(0,limit).map(x=>({title:(x.title||'').slice(0,220),link:x.link||'',published:x.pubDate||'',source:x.source||''}));
   }catch(e){
     try{
       const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
-      const xml=await fetchViaProxies(rss,'text',18000);
+      const xml=await fetchViaProxies(rss,'text',10000);
       const doc=new DOMParser().parseFromString(xml,'text/xml');
       items=[...doc.querySelectorAll('item')].slice(0,limit).map(x=>({title:(x.querySelector('title')?.textContent||'').slice(0,220),link:x.querySelector('link')?.textContent||'',published:x.querySelector('pubDate')?.textContent||'',source:x.querySelector('source')?.textContent||''}));
     }catch(e2){}
@@ -239,14 +242,14 @@ async function staticSnapshot(symbol, interval){
     if(!s) return null;
     return {symbol,label:SYMBOLS[symbol].label,interval:s.interval||interval,generated_at:d.generated_at,
       indicators:s.indicators||{},recent_candles:s.recent_candles||[],macro:d.macro||[],news:s.news||[],
-      warnings:['بيانات من تحديث GitHub Actions التلقائي']};
+      warnings:['بيانات من النسخة المرفوعة على GitHub']};
   }catch(e){ return null; }
 }
 async function marketSnapshot(symbol, interval){
   const st=await staticSnapshot(symbol,interval);
   const stBars=st&&st.indicators&&Number(st.indicators.bars)||0;
   const stAge=st&&isFinite(Date.parse(st.generated_at))?Date.now()-Date.parse(st.generated_at):Infinity;
-  // Scheduled GitHub data is the reliable primary source — use it whenever it has real depth.
+  // Fast path: freshly committed snapshot.
   if(st && stBars>=30 && stAge < 20*60*1000) return st;
   const warnings=[];
   let cs=[]; try{ cs=await fetchCandles(symbol,interval); }catch(e){ warnings.push('price error'); }
@@ -254,12 +257,14 @@ async function marketSnapshot(symbol, interval){
   const news=[...await fetchNews(SYMBOLS[symbol].query,8), ...await fetchNews('financial markets economy central banks',6)];
   const seen=new Set(), merged=[];
   for(const n of news){ if(n.title && !seen.has(n.title)){ seen.add(n.title); merged.push(n); } if(merged.length>=12) break; }
+  // Refreshing macro through free proxies is slow — reuse the committed snapshot when present.
+  const macro=(st&&st.macro&&st.macro.length>=2)?st.macro:await fetchMacro();
   const snap={symbol,label:SYMBOLS[symbol].label,interval,generated_at:new Date().toISOString().slice(0,19),
     indicators:indicators(cs),recent_candles:cs.slice(-16).map(c=>({t:new Date(c.t*1000).toISOString().slice(0,16).replace('T',' '),o:+c.o.toFixed(4),h:+c.h.toFixed(4),l:+c.l.toFixed(4),c:+c.c.toFixed(4)})),
-    macro:await fetchMacro(), news:merged, warnings};
+    macro, news:merged, warnings};
   if(st){
     // Never replace a full dataset with a 1-candle live fallback.
-    if(cs.length<30){ snap.indicators=st.indicators; snap.recent_candles=st.recent_candles; snap.generated_at=st.generated_at; warnings.push('بيانات من تحديث GitHub Actions التلقائي'); }
+    if(cs.length<30){ snap.indicators=st.indicators; snap.recent_candles=st.recent_candles; snap.generated_at=st.generated_at; warnings.push('بيانات من النسخة الاحتياطية على GitHub'); }
     if(!snap.news.length) snap.news=st.news;
     if(snap.macro.length<2) snap.macro=st.macro;
   }
