@@ -375,8 +375,13 @@ function alignSeries(hist,live){
 }
 async function gateCandles(symbol,tf){
   let hist=null, live=null;
-  try{ const h=await loadHistory(symbol,tf); hist=h.candles; }catch(e){}
   if(symbol==='XAUUSD' && PRO_CANDLES && PRO_CANDLES.length>=120 && PRO_CANDLES_TF===tf) live=PRO_CANDLES;
+  // Only H1/H4/D1 have saved history; M15/M30 live on the live candles alone,
+  // otherwise the gate would wait on dead CORS proxies and freeze the panel.
+  const HIST_TFS=['H1','H4','D1'];
+  if(!(live && !HIST_TFS.includes(tf))){
+    try{ const h=await withTimeout(loadHistory(symbol,tf),8000,null); if(h&&h.candles) hist=h.candles; }catch(e){}
+  }
   if(hist && hist.length>=100 && live && live.length) return {candles:alignSeries(hist,live),source:'history+live'};
   if(hist && hist.length>=100) return {candles:hist,source:'history'};
   if(live && live.length>=100) return {candles:live,source:'live'};
@@ -504,7 +509,8 @@ function renderRec(r){
     ['الدخول',esc(fmt(r.entry))],['الوقف',esc(fmt(r.stop))],['الهدف',esc(targets)],
     ['R:R',esc(fmt(r.rr))]
   ].map(x=>'<div class="rec-row"><span>'+x[0]+'</span>'+x[1]+'</div>').join('')+
-    '<p class="rec-note">'+esc(fmt(r.conditions||r.wait_conditions))+' · '+esc(fmt(r.risk||r.risk_note))+'</p>';
+    '<p class="rec-note">'+esc(fmt(r.conditions||r.wait_conditions))+' · '+esc(fmt(r.risk||r.risk_note))+
+      (r.symbol?(' · '+esc(r.symbol)+' / '+esc(r.tf||'')):'')+'</p>';
 }
 async function proRecommend(){
   if(PRO_BUSY) return;
@@ -539,7 +545,12 @@ async function proRecommend(){
     if(r.ok) markProviderOK(p); else markProviderFail(p);
     if(r.ok){ const o=parseJSON(r.text); if(o&&o.bias){ rec=o; rec._model=p.name; break; } }
   }
-  if(rec){ proSaveRec(rec); renderRec(rec); err('اتعملت توصية جديدة من '+rec._model+'.'); }
+  if(rec){
+    rec.symbol=proEl('proSymbol')?.value||'XAUUSD';
+    rec.tf=proEl('proInterval')?.value||'H1';
+    proSaveRec(rec); renderRec(rec);
+    err('اتعملت توصية جديدة من '+rec._model+' ('+rec.symbol+' / '+rec.tf+').');
+  }
   else err('ما قدرتش أطلع توصية — جرّب تاني بعد ما تربط مزود شغال.');
   if(btn) btn.disabled=false;
 }
@@ -751,7 +762,15 @@ function proInit(){
   if(q) q.innerHTML=PRO_PROMPTS.map(x=>'<button onclick="proSend(this.querySelector(\'span\').textContent)">'+
     '<svg class="ico"><use href="#i-bolt"/></svg><span>'+esc(x)+'</span></button>').join('');
   proRenderChat();
-  renderRec(proLoadRec());
+  // A saved recommendation belongs to one instrument/timeframe — never show it on another.
+  const savedRec=proLoadRec();
+  const curSym=proEl('proSymbol')?.value||'XAUUSD', curTf=proEl('proInterval')?.value||'H1';
+  if(savedRec && (savedRec.symbol!==curSym || savedRec.tf!==curTf)){
+    try{ localStorage.removeItem(PRO_REC_KEY); }catch(e){}
+    renderRec(null);
+  }else{
+    renderRec(savedRec);
+  }
   const input=proEl('proInput');
   if(input) input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); proSend(); } });
   const harmony=proEl('proHarmony'); if(harmony){
@@ -778,6 +797,8 @@ function proInit(){
   [proEl('proSymbol'),proEl('proInterval')].forEach(n=>{
     if(n) n.addEventListener('change',()=>{
       PRO_CANDLES=null; PRO_CANDLES_TF=null; GATE_CACHE={key:'',at:0,data:null}; PRO_CTX=null;
+      try{ localStorage.removeItem(PRO_REC_KEY); }catch(e){}
+      renderRec(null);
       refreshContext();
     });
   });
