@@ -489,6 +489,7 @@ async function toggleAuto(){
 }
 
 function proInit(){
+  try{ localStorage.removeItem('market-ai-pro-chat-v1'); }catch(e){}
   const sel=proEl('proSymbol');
   if(sel){
     sel.innerHTML=Object.entries(SYMBOLS).map(([k,v])=>`<option value="${k}">${esc(v.label)}</option>`).join('');
