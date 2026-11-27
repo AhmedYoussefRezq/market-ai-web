@@ -65,19 +65,23 @@ function proUpdate(id,text,meta){
 function proRenderChat(){
   const box=proEl('chat'); if(!box) return;
   const all=proChat();
+  const aiAv='<span class="avatar ai"><svg class="ico"><use href="#i-logo"/></svg></span>';
+  const meAv='<span class="avatar me">أنت</span>';
   if(!all.length){
-    box.innerHTML='<div class="msg bot"><div class="who"><b>Market AI Pro</b></div><div class="body">'+
-      'أهلاً! اسألني عن السوق أو اطلب تحليل أداة معينة. أنا بشوف بيانات السوق والباكتيست المرفقة قبل ما أجاوب — '+
+    box.innerHTML='<div class="msg bot">'+aiAv+'<div class="bubble"><div class="who"><b>Market AI Pro</b></div>'+
+      '<div class="body">أهلاً! اسألني عن السوق أو اطلب تحليل أداة معينة. أنا بشوف بيانات السوق والباكتيست المرفقة قبل ما أجاوب — '+
       'ومش باخترع أرقام. التطبيق ده <b>تحليل بس</b> ومش بيفتح أوامر.'+
-      '<div class="foot"><button onclick="proConnect()">اربط AI مجاني</button></div></div>';
+      '<div class="foot"><button onclick="proConnect()"><svg class="ico"><use href="#i-key"/></svg> اربط AI مجاني</button></div></div></div></div>';
   }else{
     box.innerHTML=all.map(m=>{
       const meta=m.meta||{};
       return '<div class="msg '+m.role+'" data-id="'+esc(m.id)+'">'+
-        (m.role==='bot'?'<div class="who"><b>'+esc(meta.model||'AI')+'</b>'+(meta.ms?'<span>· '+meta.ms+'ms</span>':'')+'<span>· '+esc(m.at||'')+'</span></div>':'<div class="who">أنت · '+esc(m.at||'')+'</div>')+
+        (m.role==='bot'?aiAv:meAv)+
+        '<div class="bubble">'+
+        (m.role==='bot'?'<div class="who"><b>'+esc(meta.model||'AI')+'</b>'+(meta.ms?'<span>· '+meta.ms+'ms</span>':'')+'<span>· '+esc(m.at||'')+'</span></div>':'<div class="who">'+esc(m.at||'')+'</div>')+
         '<div class="body">'+proMd(m.text)+'</div>'+
-        (m.role==='bot'?'<div class="foot"><button class="ghost" onclick="proCopy(\''+esc(m.id)+'\')">نسخ</button></div>':'')+
-        '</div>';
+        (m.role==='bot'?'<div class="foot"><button onclick="proCopy(\''+esc(m.id)+'\')"><svg class="ico"><use href="#i-copy"/></svg> نسخ</button></div>':'')+
+        '</div></div>';
     }).join('');
   }
   const meta=proEl('chatMeta'); if(meta) meta.textContent=all.length+' رسالة محفوظة في هذا المتصفح';
@@ -97,13 +101,23 @@ function exportChat(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));
   a.download='market-ai-pro-chat.txt'; a.click(); URL.revokeObjectURL(a.href);
 }
-function toggleProSettings(){
-  const s=proEl('proSettings'); if(s) s.style.display=s.style.display==='none'?'block':'none';
+function toggleProSettings(evt){
+  const ov=proEl('settingsOverlay'); if(!ov) return;
+  if(evt && evt.target!==ov) return;
+  const show=ov.style.display!=='flex';
+  ov.style.display=show?'flex':'none';
+  document.body.classList.toggle('modal-open',show);
+}
+function toggleSidebar(){
+  const rail=proEl('rail'), back=proEl('railBackdrop'); if(!rail) return;
+  const open=rail.classList.toggle('open');
+  if(back) back.classList.toggle('show',open);
 }
 function proConnect(){
-  const s=proEl('proSettings'); if(s){ s.style.display='block'; s.scrollIntoView({behavior:'smooth',block:'center'}); }
+  const ov=proEl('settingsOverlay');
+  if(ov){ ov.style.display='flex'; document.body.classList.add('modal-open'); }
   const k=proEl('quickKey'); if(k) setTimeout(()=>k.focus(),250);
-  err('الصق مفتاح OpenRouter مجاني واضغط الزر — المفاتيح بتتخزن في المتصفح بس.');
+  err('الصق مفتاح AI مجاني واضغط الزر — المفاتيح بتتخزن في متصفحك بس.');
 }
 function proQuickProvider(source){
   if(source==='openrouter'){ quickSetup(); proFillModels(); return; }
@@ -294,7 +308,7 @@ async function proSend(preset){
     const id=proPush('bot',msg);
     const body=proFind(id)?.querySelector('.body');
     if(body) body.innerHTML=proMd(msg)+
-      '<div class="foot"><button onclick="proConnect()">اربط AI مجاني الآن</button></div>';
+      '<div class="foot"><button onclick="proConnect()"><svg class="ico"><use href="#i-key"/></svg> اربط AI مجاني الآن</button></div>';
     proConnect();
     return;
   }
@@ -307,7 +321,8 @@ async function proSend(preset){
     {role:'user',content:JSON.stringify({question:text,context:PRO_CTX})}];
 
   PRO_BUSY=true;
-  const btn=proEl('sendBtn'); if(btn){ btn.disabled=true; btn.textContent='جاري الرد...'; }
+  const btn=proEl('sendBtn'), lbl=btn?.querySelector('span');
+  if(btn){ btn.disabled=true; if(lbl) lbl.textContent='جاري الرد...'; }
   const ids=models.map(p=>{
     const id=proPush('bot','جاري التحليل...',{model:p.name,at:proTime()});
     const body=proFind(id)?.querySelector('.body');
@@ -324,7 +339,7 @@ async function proSend(preset){
   }catch(e){ err('خطأ: '+e.message); }
   finally{
     PRO_BUSY=false;
-    if(btn){ btn.disabled=false; btn.textContent='إرسال'; }
+    if(btn){ btn.disabled=false; const l=btn.querySelector('span'); if(l) l.textContent='إرسال'; }
   }
 }
 
@@ -338,7 +353,8 @@ function proInit(){
   const cons=proEl('proConsensus'); if(cons) cons.checked=!!proPrefs().consensus;
   proFillModels();
   const q=proEl('quickPrompts');
-  if(q) q.innerHTML=PRO_PROMPTS.map(x=>'<button onclick="proSend(this.textContent)">'+esc(x)+'</button>').join('');
+  if(q) q.innerHTML=PRO_PROMPTS.map(x=>'<button onclick="proSend(this.querySelector(\'span\').textContent)">'+
+    '<svg class="ico"><use href="#i-bolt"/></svg><span>'+esc(x)+'</span></button>').join('');
   proRenderChat();
   const input=proEl('proInput');
   if(input) input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); proSend(); } });
